@@ -12,35 +12,31 @@ from cast_highlight_mcp.server import call_tool, get_client
 class TestGetClient:
     """Tests for get_client function."""
 
-    def test_get_client_creates_new_client(self, monkeypatch):
-        """Test get_client creates a new client when none exists."""
-        # Reset global client state
-        server.client = None
+    def test_get_client_raises_when_not_initialized(self):
+        """Test get_client raises RuntimeError when client is not initialized."""
+        # Ensure client is not initialized
+        original_client = server._client
+        server._client = None
 
-        mock_config = MagicMock()
-        mock_client_class = MagicMock()
-
-        with patch("cast_highlight_mcp.server.load_config", return_value=mock_config):
-            with patch("cast_highlight_mcp.server.HighlightClient", mock_client_class) as mock_hl:
-                result = get_client()
-
-                mock_hl.assert_called_once_with(mock_config)
-                assert result == mock_client_class.return_value
-
-        # Clean up
-        server.client = None
+        try:
+            with pytest.raises(RuntimeError, match="Client not initialized"):
+                get_client()
+        finally:
+            # Restore original state
+            server._client = original_client
 
     def test_get_client_returns_existing_client(self):
         """Test get_client returns existing client if available."""
+        original_client = server._client
         mock_existing_client = MagicMock()
-        server.client = mock_existing_client
+        server._client = mock_existing_client
 
-        result = get_client()
-
-        assert result is mock_existing_client
-
-        # Clean up
-        server.client = None
+        try:
+            result = get_client()
+            assert result is mock_existing_client
+        finally:
+            # Restore original state
+            server._client = original_client
 
 
 class TestCallToolGetCompany:

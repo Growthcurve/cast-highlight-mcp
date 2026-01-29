@@ -15,6 +15,14 @@ class HighlightClient:
         self.base_url = config.base_url.rstrip("/")
         self._client: httpx.AsyncClient | None = None
 
+    async def __aenter__(self) -> "HighlightClient":
+        """Enter async context manager."""
+        return self
+
+    async def __aexit__(self, _exc_type, _exc_val, _exc_tb) -> None:
+        """Exit async context manager, ensuring client is closed."""
+        await self.close()
+
     @property
     def headers(self) -> dict[str, str]:
         return {
@@ -30,7 +38,8 @@ class HighlightClient:
             )
         return self._client
 
-    async def close(self):
+    async def close(self) -> None:
+        """Close the HTTP client and release resources."""
         if self._client:
             await self._client.aclose()
             self._client = None

@@ -175,3 +175,41 @@ class TestHighlightClientRequests:
         assert client._client is None
         await client.close()  # Should not raise
         assert client._client is None
+
+
+class TestHighlightClientContextManager:
+    """Tests for HighlightClient async context manager."""
+
+    @pytest.mark.asyncio
+    async def test_context_manager_enter(self, mock_config):
+        """Test async context manager returns client on enter."""
+        client = HighlightClient(mock_config)
+        async with client as ctx:
+            assert ctx is client
+
+    @pytest.mark.asyncio
+    async def test_context_manager_closes_on_exit(self, mock_config):
+        """Test async context manager closes client on exit."""
+        client = HighlightClient(mock_config)
+        mock_http_client = AsyncMock()
+        client._client = mock_http_client
+
+        async with client:
+            pass
+
+        mock_http_client.aclose.assert_called_once()
+        assert client._client is None
+
+    @pytest.mark.asyncio
+    async def test_context_manager_closes_on_exception(self, mock_config):
+        """Test async context manager closes client even on exception."""
+        client = HighlightClient(mock_config)
+        mock_http_client = AsyncMock()
+        client._client = mock_http_client
+
+        with pytest.raises(ValueError):
+            async with client:
+                raise ValueError("Test error")
+
+        mock_http_client.aclose.assert_called_once()
+        assert client._client is None

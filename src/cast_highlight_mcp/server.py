@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from contextlib import AsyncExitStack
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
@@ -12,15 +13,25 @@ from .config import load_config
 
 # Initialize server
 server = Server("cast-highlight-mcp")
-client: HighlightClient | None = None
+
+# Client instance managed by lifecycle
+_client: HighlightClient | None = None
 
 
 def get_client() -> HighlightClient:
-    global client
-    if client is None:
-        config = load_config()
-        client = HighlightClient(config)
-    return client
+    """Get the managed client instance.
+
+    Returns:
+        The HighlightClient instance.
+
+    Raises:
+        RuntimeError: If called before client is initialized.
+    """
+    if _client is None:
+        raise RuntimeError(
+            "Client not initialized. Server must be started with run_server()."
+        )
+    return _client
 
 
 # Define tools
@@ -208,7 +219,15 @@ def main():
     """Run the MCP server."""
 
     async def run():
-        async with stdio_server() as (read_stream, write_stream):
+        global _client
+
+        async with AsyncExitStack() as stack:
+            # Initialize client with proper lifecycle management
+            config = load_config()
+            _client = await stack.enter_async_context(HighlightClient(config))
+
+            # Run the MCP server
+            read_stream, write_stream = await stack.enter_async_context(stdio_server())
             await server.run(read_stream, write_stream, server.create_initialization_options())
 
     asyncio.run(run())
