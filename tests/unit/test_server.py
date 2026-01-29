@@ -64,9 +64,7 @@ class TestToolSchemas:
                 )
                 # company_id should be optional (not in required)
                 required = schema.get("required", [])
-                assert "company_id" not in required, (
-                    f"{tool.name} company_id should be optional"
-                )
+                assert "company_id" not in required, f"{tool.name} company_id should be optional"
 
     def test_application_tools_require_application_id(self):
         """Test application tools require application_id."""
@@ -81,9 +79,7 @@ class TestToolSchemas:
             if tool.name in app_tools:
                 schema = tool.inputSchema
                 required = schema.get("required", [])
-                assert "application_id" in required, (
-                    f"{tool.name} should require application_id"
-                )
+                assert "application_id" in required, f"{tool.name} should require application_id"
 
     def test_domain_tools_require_domain_id(self):
         """Test domain tools require domain_id."""
@@ -92,9 +88,7 @@ class TestToolSchemas:
             if tool.name in domain_tools:
                 schema = tool.inputSchema
                 required = schema.get("required", [])
-                assert "domain_id" in required, (
-                    f"{tool.name} should require domain_id"
-                )
+                assert "domain_id" in required, f"{tool.name} should require domain_id"
 
 
 class TestListTools:
