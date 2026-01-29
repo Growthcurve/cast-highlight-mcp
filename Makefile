@@ -1,7 +1,7 @@
 # Highlight MCP Server - Makefile
 # Python-based MCP server for CAST Highlight API
 
-.PHONY: all install dev run test lint lint-fix format quality clean help test-api
+.PHONY: all install dev run test lint lint-fix format quality clean help test-api hooks
 
 # Default target
 all: quality
@@ -16,10 +16,16 @@ install:
 	.venv/bin/pip install -e ".[dev]"
 
 ## Initial project setup
-setup: install
+setup: install hooks
 	@echo "Setting up project..."
 	@test -f .env || cp .env.example .env
 	@echo "Setup complete. Edit .env with your CAST Highlight credentials."
+
+## Install pre-commit hooks (shift-left on linting)
+hooks:
+	@.venv/bin/pip install pre-commit -q
+	@.venv/bin/pre-commit install
+	@echo "Pre-commit hooks installed. Lint/format runs automatically on commit."
 
 # ============================================================================
 # DEVELOPMENT
@@ -90,7 +96,8 @@ help:
 	@echo ""
 	@echo "Setup:"
 	@echo "  make install        Install dependencies in venv"
-	@echo "  make setup          Initial project setup"
+	@echo "  make setup          Initial project setup (includes hooks)"
+	@echo "  make hooks          Install pre-commit hooks"
 	@echo ""
 	@echo "Development:"
 	@echo "  make run            Run MCP server"
