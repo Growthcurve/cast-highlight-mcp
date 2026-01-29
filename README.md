@@ -45,7 +45,7 @@ Set the following environment variables:
 
 ```bash
 # Required
-HIGHLIGHT_BASE_URL=https://rpa.casthighlight.com/WS2
+HIGHLIGHT_BASE_URL=https://app.casthighlight.com/WS2
 HIGHLIGHT_ACCESS_TOKEN=your-access-token
 HIGHLIGHT_COMPANY_ID=your-company-id
 
@@ -56,7 +56,7 @@ HIGHLIGHT_TIMEOUT=30  # API timeout in seconds (default: 30)
 You can also create a `.env` file in your project directory:
 
 ```bash
-HIGHLIGHT_BASE_URL=https://rpa.casthighlight.com/WS2
+HIGHLIGHT_BASE_URL=https://app.casthighlight.com/WS2
 HIGHLIGHT_ACCESS_TOKEN=your-access-token
 HIGHLIGHT_COMPANY_ID=12345
 ```
@@ -83,7 +83,7 @@ Add to your Claude Desktop configuration file:
     "highlight": {
       "command": "cast-highlight-mcp",
       "env": {
-        "HIGHLIGHT_BASE_URL": "https://rpa.casthighlight.com/WS2",
+        "HIGHLIGHT_BASE_URL": "https://app.casthighlight.com/WS2",
         "HIGHLIGHT_ACCESS_TOKEN": "your-access-token",
         "HIGHLIGHT_COMPANY_ID": "12345"
       }
@@ -100,7 +100,7 @@ If installed in a virtual environment or using uv, specify the full path:
     "highlight": {
       "command": "/path/to/venv/bin/cast-highlight-mcp",
       "env": {
-        "HIGHLIGHT_BASE_URL": "https://rpa.casthighlight.com/WS2",
+        "HIGHLIGHT_BASE_URL": "https://app.casthighlight.com/WS2",
         "HIGHLIGHT_ACCESS_TOKEN": "your-access-token",
         "HIGHLIGHT_COMPANY_ID": "12345"
       }
@@ -118,7 +118,7 @@ Or using uv to run directly:
       "command": "uv",
       "args": ["run", "cast-highlight-mcp"],
       "env": {
-        "HIGHLIGHT_BASE_URL": "https://rpa.casthighlight.com/WS2",
+        "HIGHLIGHT_BASE_URL": "https://app.casthighlight.com/WS2",
         "HIGHLIGHT_ACCESS_TOKEN": "your-access-token",
         "HIGHLIGHT_COMPANY_ID": "12345"
       }
