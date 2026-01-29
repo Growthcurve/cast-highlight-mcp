@@ -52,7 +52,7 @@ test:
 
 ## Run tests with coverage
 test-coverage:
-	.venv/bin/pytest tests/ -v --cov=src/highlight_mcp --cov-report=term-missing
+	.venv/bin/pytest tests/ -v --cov=src/cast_highlight_mcp --cov-report=term-missing
 
 # ============================================================================
 # CODE QUALITY
