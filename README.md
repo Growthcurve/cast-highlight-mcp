@@ -25,30 +25,18 @@ This MCP server wraps the CAST Highlight REST API, enabling AI agents to:
 
 ### Installation
 
-#### Using pip
+#### From GitHub
 
 ```bash
-pip install cast-highlight-mcp
-```
-
-#### Using uv
-
-```bash
-uv pip install cast-highlight-mcp
+pip install git+https://github.com/Growthcurve/cast-highlight-mcp.git
 ```
 
 #### From source
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/cast-highlight-mcp.git
+git clone https://github.com/Growthcurve/cast-highlight-mcp.git
 cd cast-highlight-mcp
-
-# Install with pip
 pip install -e .
-
-# Or with uv
-uv pip install -e .
 ```
 
 ### Configuration
@@ -162,7 +150,7 @@ Or using uv to run directly:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/cast-highlight-mcp.git
+git clone https://github.com/Growthcurve/cast-highlight-mcp.git
 cd cast-highlight-mcp
 
 # Install with dev dependencies
