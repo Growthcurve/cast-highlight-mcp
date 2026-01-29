@@ -1,7 +1,7 @@
 # CLAUDE.md - Highlight MCP Server
 
 > MCP Server for CAST Highlight API Integration
-> **Status**: Initial Setup | **Version**: 0.1.0
+> **Status**: Active | **Version**: 0.1.0
 
 ## Priority Legend
 
@@ -14,7 +14,7 @@
 
 ## [P0] Project Overview
 
-**cast-highlight-mcp** is a TypeScript MCP (Model Context Protocol) server that provides AI agents with access to CAST Highlight's application portfolio analysis and software intelligence capabilities.
+**cast-highlight-mcp** is a Python MCP (Model Context Protocol) server that provides AI agents with access to CAST Highlight's application portfolio analysis and software intelligence capabilities.
 
 ### What This Project Does
 
@@ -27,48 +27,57 @@
 
 | Component | Technology |
 |-----------|------------|
-| Runtime | Node.js 20+ |
-| Language | TypeScript 5.x |
-| Protocol | MCP SDK (@modelcontextprotocol/sdk) |
-| API Client | CAST Highlight REST API v3 |
-| Build | tsup |
-| Test | Vitest |
-| Lint | ESLint + Prettier |
+| Runtime | Python 3.10+ |
+| Language | Python |
+| Protocol | MCP SDK (mcp) |
+| HTTP Client | httpx |
+| Config | python-dotenv |
+| Test | pytest, pytest-asyncio |
+| Lint | ruff |
 
 ---
 
 ## [P0] Single-Path Workflows
 
-### Build
+### Setup
 
 ```bash
-make build
+make setup          # Create venv, install deps, copy .env.example
+```
+
+### Build/Install
+
+```bash
+make install        # Install dependencies in virtual environment
 ```
 
 ### Test
 
 ```bash
-make test
+make test           # Run all tests
+make test-coverage  # Run tests with coverage report
 ```
 
 ### Run Development Server
 
 ```bash
-make dev
+make run            # Run MCP server
+make dev            # Alias for run
 ```
 
 ### Lint and Format
 
 ```bash
-make lint-fix    # Fix all linting issues
-make format      # Format all code
-make quality     # Run all quality checks
+make lint           # Check for linting issues
+make lint-fix       # Fix linting issues
+make format         # Format code with ruff
+make quality        # Run all quality checks
 ```
 
-### Type Check
+### Test API Connection
 
 ```bash
-make typecheck
+make test-api       # Test API connection with current credentials
 ```
 
 ---
@@ -77,31 +86,29 @@ make typecheck
 
 ```
 cast-highlight-mcp/
-├── CLAUDE.md           # This file - AI agent instructions
-├── README.md           # Project overview and setup
-├── Makefile            # Single-path build commands
-├── package.json        # Node.js dependencies
-├── tsconfig.json       # TypeScript configuration
+├── CLAUDE.md              # This file - AI agent instructions
+├── README.md              # Project overview and setup
+├── Makefile               # Single-path build commands
+├── pyproject.toml         # Python project configuration
+├── .env.example           # Environment template
 ├── src/
-│   ├── index.ts        # MCP server entry point
-│   ├── server.ts       # MCP server implementation
-│   ├── tools/          # MCP tool definitions
-│   │   └── index.ts    # Tool exports
-│   ├── api/            # CAST Highlight API client
-│   │   ├── client.ts   # API client class
-│   │   └── types.ts    # API type definitions
-│   └── utils/          # Utility functions
-├── tests/              # Test files
-│   ├── unit/           # Unit tests
-│   └── integration/    # Integration tests
-├── docs/               # Documentation
-│   ├── API.md          # API reference
-│   ├── TOOLS.md        # MCP tools documentation
-│   └── DEVELOPER.md    # Developer guide
-├── scripts/            # Utility scripts
-│   └── setup.sh        # Initial setup script
-└── .claude-mpm/        # Claude MPM configuration
-    └── memories/       # Project knowledge base
+│   └── cast_highlight_mcp/
+│       ├── __init__.py    # Package init
+│       ├── server.py      # MCP server implementation
+│       ├── client.py      # CAST Highlight API client
+│       └── config.py      # Configuration management
+├── tests/                 # Test files
+│   ├── test_client.py     # API client tests
+│   ├── test_server.py     # Server tests
+│   └── test_tools.py      # MCP tool tests
+├── docs/                  # Documentation
+│   ├── API.md             # CAST Highlight API reference
+│   ├── TOOLS.md           # MCP tools documentation
+│   ├── DEVELOPER.md       # Developer guide
+│   ├── TOKEN-SETUP.md     # Token setup guide
+│   └── images/            # Documentation images
+└── scripts/               # Utility scripts
+    └── test_api.py        # API connection test script
 ```
 
 ---
@@ -110,52 +117,56 @@ cast-highlight-mcp/
 
 ### Tool Definition Pattern
 
-```typescript
-// src/tools/example-tool.ts
-import { z } from "zod";
-
-export const exampleTool = {
-  name: "highlight_example",
-  description: "Brief description of what this tool does",
-  inputSchema: z.object({
-    applicationId: z.string().describe("The application ID"),
-    // ... other parameters
-  }),
-  handler: async (params: { applicationId: string }) => {
-    // Implementation
-    return { result: "data" };
-  },
-};
+```python
+# In server.py
+@server.list_tools()
+async def list_tools() -> list[Tool]:
+    return [
+        Tool(
+            name="highlight_get_company",
+            description="Get company details",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "company_id": {
+                        "type": "integer",
+                        "description": "Company ID (optional, uses default if not provided)",
+                    }
+                },
+            },
+        ),
+        # ... more tools
+    ]
 ```
 
 ### API Client Pattern
 
-```typescript
-// src/api/client.ts
-export class HighlightClient {
-  constructor(private config: HighlightConfig) {}
+```python
+# src/cast_highlight_mcp/client.py
+class HighlightClient:
+    def __init__(self, config: Config):
+        self.config = config
+        self.base_url = config.base_url
+        self._client: httpx.AsyncClient | None = None
 
-  async getApplications(): Promise<Application[]> {
-    // API call implementation
-  }
-}
+    async def get_company(self, company_id: int | None = None) -> dict:
+        cid = company_id or self.config.company_id
+        return await self.get(f"/companies/{cid}")
 ```
 
-### Server Registration Pattern
+### Server Handler Pattern
 
-```typescript
-// src/server.ts
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+```python
+# src/cast_highlight_mcp/server.py
+@server.call_tool()
+async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+    api = get_client()
 
-const server = new Server({
-  name: "cast-highlight-mcp",
-  version: "0.1.0",
-});
+    if name == "highlight_get_company":
+        result = await api.get_company(arguments.get("company_id"))
+    # ... handle other tools
 
-// Register tools
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [/* tool definitions */],
-}));
+    return [TextContent(type="text", text=json.dumps(result, indent=2))]
 ```
 
 ---
@@ -167,26 +178,28 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 CAST Highlight uses OAuth2 Bearer tokens. Configuration via environment:
 
 ```bash
-HIGHLIGHT_DOMAIN="your-domain.casthighlight.com"
-HIGHLIGHT_CLIENT_ID="your-client-id"
-HIGHLIGHT_CLIENT_SECRET="your-client-secret"
+HIGHLIGHT_BASE_URL="https://app.casthighlight.com/WS2"
+HIGHLIGHT_ACCESS_TOKEN="your-bearer-token"
+HIGHLIGHT_COMPANY_ID="your-company-id"
 ```
+
+See [docs/TOKEN-SETUP.md](./docs/TOKEN-SETUP.md) for detailed token generation instructions.
 
 ### Key API Endpoints
 
 | Endpoint | Purpose |
 |----------|---------|
-| `/domains` | List available domains |
-| `/domains/{id}/applications` | Get applications in portfolio |
-| `/applications/{id}` | Application details |
-| `/applications/{id}/metrics` | Application health metrics |
-| `/applications/{id}/technologies` | Technology breakdown |
-| `/applications/{id}/cloudReadiness` | Cloud migration readiness |
+| `/companies/{id}` | Get company details |
+| `/domains/{id}` | Get domain details |
+| `/domains/{id}/applications` | List applications in domain |
+| `/domains/{id}/applications/{id}` | Get application details |
+| `/domains/{id}/applications/{id}/metrics` | Application health metrics |
+| `/domains/{id}/technologies` | Technologies in domain |
 
 ### Rate Limiting
 
-- Implement exponential backoff
-- Cache responses where appropriate
+- Implement exponential backoff (TODO: Issue #2)
+- Cache responses where appropriate (TODO: Issue #9)
 - Respect API rate limits (check headers)
 
 ---
@@ -197,17 +210,15 @@ HIGHLIGHT_CLIENT_SECRET="your-client-secret"
 
 ```bash
 # .env (never commit!)
-HIGHLIGHT_DOMAIN=          # CAST Highlight domain
-HIGHLIGHT_CLIENT_ID=       # OAuth2 client ID
-HIGHLIGHT_CLIENT_SECRET=   # OAuth2 client secret
+HIGHLIGHT_BASE_URL=https://app.casthighlight.com/WS2
+HIGHLIGHT_ACCESS_TOKEN=your-bearer-token
+HIGHLIGHT_COMPANY_ID=your-company-id
 ```
 
 ### Optional Configuration
 
 ```bash
-HIGHLIGHT_TIMEOUT=30000    # API timeout in ms
-HIGHLIGHT_CACHE_TTL=300    # Cache TTL in seconds
-LOG_LEVEL=info             # Logging level
+HIGHLIGHT_TIMEOUT=30    # API timeout in seconds (default: 30)
 ```
 
 ---
@@ -219,70 +230,60 @@ LOG_LEVEL=info             # Logging level
 Test individual tools and API client methods in isolation.
 
 ```bash
-make test-unit
+make test
 ```
 
-### Integration Tests
-
-Test against CAST Highlight API (requires credentials).
+### Test with Coverage
 
 ```bash
-make test-integration
+make test-coverage
 ```
 
 ### Test File Naming
 
-- `*.test.ts` - Unit tests
-- `*.integration.ts` - Integration tests
+- `test_*.py` - All test files
+
+### Running Specific Tests
+
+```bash
+.venv/bin/pytest tests/test_client.py -v
+.venv/bin/pytest tests/ -k "test_get_company"
+```
 
 ---
 
-## [P2] MCP Tools to Implement
+## [P2] Available MCP Tools
 
-### Phase 1: Core Tools
-
-1. **highlight_list_applications** - List all applications in portfolio
-2. **highlight_get_application** - Get application details
-3. **highlight_get_metrics** - Get application health metrics
-4. **highlight_get_technologies** - Get technology breakdown
-
-### Phase 2: Analysis Tools
-
-5. **highlight_cloud_readiness** - Cloud migration assessment
-6. **highlight_green_impact** - Environmental impact metrics
-7. **highlight_software_health** - Overall health score
-8. **highlight_technical_debt** - Technical debt analysis
-
-### Phase 3: Advanced Tools
-
-9. **highlight_compare_applications** - Compare multiple apps
-10. **highlight_trend_analysis** - Historical trend data
-11. **highlight_recommendations** - AI-generated recommendations
+| Tool | Description |
+|------|-------------|
+| `highlight_get_company` | Get company details |
+| `highlight_list_domains` | List all domains for company |
+| `highlight_get_domain` | Get domain details |
+| `highlight_list_applications` | List applications in domain |
+| `highlight_get_application` | Get application details |
+| `highlight_get_metrics` | Get application health metrics |
+| `highlight_get_technologies` | Get technology breakdown |
+| `highlight_get_cloud_readiness` | Cloud migration assessment |
+| `highlight_get_green_impact` | Environmental impact metrics |
+| `highlight_get_cves` | CVE vulnerabilities |
+| `highlight_get_third_parties` | Third-party components |
+| `highlight_get_benchmark` | Global benchmark comparison |
 
 ---
 
 ## [P3] Documentation Links
 
 - [README.md](./README.md) - Project overview
-- [docs/API.md](./docs/API.md) - API reference
+- [docs/API.md](./docs/API.md) - CAST Highlight API reference
 - [docs/TOOLS.md](./docs/TOOLS.md) - MCP tools documentation
 - [docs/DEVELOPER.md](./docs/DEVELOPER.md) - Developer guide
+- [docs/TOKEN-SETUP.md](./docs/TOKEN-SETUP.md) - Token setup guide
 
 ### External Resources
 
 - [MCP SDK Documentation](https://modelcontextprotocol.io/docs)
 - [CAST Highlight API Docs](https://doc.casthighlight.com/)
-- [TypeScript Handbook](https://www.typescriptlang.org/docs/)
-
----
-
-## [P3] Memory System
-
-Project knowledge is stored in `.claude-mpm/memories/`:
-
-- `architecture.md` - Architecture decisions
-- `api-patterns.md` - Discovered API patterns
-- `troubleshooting.md` - Known issues and solutions
+- [Python httpx Docs](https://www.python-httpx.org/)
 
 ---
 
@@ -290,10 +291,13 @@ Project knowledge is stored in `.claude-mpm/memories/`:
 
 | Task | Command |
 |------|---------|
-| Build | `make build` |
+| Setup | `make setup` |
+| Install | `make install` |
 | Test | `make test` |
-| Dev server | `make dev` |
+| Run server | `make run` |
+| Lint | `make lint` |
 | Lint fix | `make lint-fix` |
-| Type check | `make typecheck` |
-| All quality | `make quality` |
+| Format | `make format` |
+| Quality | `make quality` |
 | Clean | `make clean` |
+| Help | `make help` |
