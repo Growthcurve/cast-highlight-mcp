@@ -1,4 +1,4 @@
-# Highlight MCP Server
+# CAST Highlight MCP Server
 
 An MCP (Model Context Protocol) server that provides AI agents with access to CAST Highlight's application portfolio analysis and software intelligence capabilities.
 
@@ -6,138 +6,190 @@ An MCP (Model Context Protocol) server that provides AI agents with access to CA
 
 This MCP server wraps the CAST Highlight REST API, enabling AI agents to:
 
-- Query application portfolios
+- Query application portfolios and domains
 - Analyze technology stacks
 - Assess cloud readiness
 - Evaluate software health metrics
-- Identify technical debt
-- Generate insights and recommendations
+- Review CVE vulnerabilities
+- Analyze green/environmental impact
+- Access third-party component information
+- Compare against global benchmarks
 
 ## Quick Start
 
 ### Prerequisites
 
-- Node.js 20 or later
+- Python 3.10 or later
 - CAST Highlight account with API access
-- API credentials (client ID and secret)
+- API access token
 
 ### Installation
+
+#### Using pip
+
+```bash
+pip install cast-highlight-mcp
+```
+
+#### Using uv
+
+```bash
+uv pip install cast-highlight-mcp
+```
+
+#### From source
 
 ```bash
 # Clone the repository
 git clone https://github.com/your-org/cast-highlight-mcp.git
 cd cast-highlight-mcp
 
-# Install dependencies
-npm install
+# Install with pip
+pip install -e .
 
-# Configure environment
-cp .env.example .env
-# Edit .env with your CAST Highlight credentials
-
-# Build the project
-make build
+# Or with uv
+uv pip install -e .
 ```
 
 ### Configuration
 
-Create a `.env` file with your CAST Highlight credentials:
+Set the following environment variables:
 
 ```bash
-HIGHLIGHT_DOMAIN=your-domain.casthighlight.com
-HIGHLIGHT_CLIENT_ID=your-client-id
-HIGHLIGHT_CLIENT_SECRET=your-client-secret
+# Required
+HIGHLIGHT_BASE_URL=https://rpa.casthighlight.com/WS2
+HIGHLIGHT_ACCESS_TOKEN=your-access-token
+HIGHLIGHT_COMPANY_ID=your-company-id
+
+# Optional
+HIGHLIGHT_TIMEOUT=30  # API timeout in seconds (default: 30)
+```
+
+You can also create a `.env` file in your project directory:
+
+```bash
+HIGHLIGHT_BASE_URL=https://rpa.casthighlight.com/WS2
+HIGHLIGHT_ACCESS_TOKEN=your-access-token
+HIGHLIGHT_COMPANY_ID=12345
 ```
 
 ### Running
 
 ```bash
-# Development mode
-make dev
-
-# Production
-make build && node dist/index.js
+# Run the MCP server
+cast-highlight-mcp
 ```
 
 ## MCP Integration
 
 ### Claude Desktop
 
-Add to your Claude Desktop configuration (`claude_desktop_config.json`):
+Add to your Claude Desktop configuration file:
+
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
 {
   "mcpServers": {
     "highlight": {
-      "command": "node",
-      "args": ["/path/to/cast-highlight-mcp/dist/index.js"],
+      "command": "cast-highlight-mcp",
       "env": {
-        "HIGHLIGHT_DOMAIN": "your-domain.casthighlight.com",
-        "HIGHLIGHT_CLIENT_ID": "your-client-id",
-        "HIGHLIGHT_CLIENT_SECRET": "your-client-secret"
+        "HIGHLIGHT_BASE_URL": "https://rpa.casthighlight.com/WS2",
+        "HIGHLIGHT_ACCESS_TOKEN": "your-access-token",
+        "HIGHLIGHT_COMPANY_ID": "12345"
       }
     }
   }
 }
 ```
 
-### Programmatic Usage
+If installed in a virtual environment or using uv, specify the full path:
 
-```typescript
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+```json
+{
+  "mcpServers": {
+    "highlight": {
+      "command": "/path/to/venv/bin/cast-highlight-mcp",
+      "env": {
+        "HIGHLIGHT_BASE_URL": "https://rpa.casthighlight.com/WS2",
+        "HIGHLIGHT_ACCESS_TOKEN": "your-access-token",
+        "HIGHLIGHT_COMPANY_ID": "12345"
+      }
+    }
+  }
+}
+```
 
-const client = new Client({
-  name: "my-app",
-  version: "1.0.0",
-});
+Or using uv to run directly:
 
-// Connect to the Highlight MCP server
-await client.connect(transport);
-
-// Use tools
-const result = await client.callTool({
-  name: "highlight_list_applications",
-  arguments: { domainId: "your-domain-id" },
-});
+```json
+{
+  "mcpServers": {
+    "highlight": {
+      "command": "uv",
+      "args": ["run", "cast-highlight-mcp"],
+      "env": {
+        "HIGHLIGHT_BASE_URL": "https://rpa.casthighlight.com/WS2",
+        "HIGHLIGHT_ACCESS_TOKEN": "your-access-token",
+        "HIGHLIGHT_COMPANY_ID": "12345"
+      }
+    }
+  }
+}
 ```
 
 ## Available Tools
 
 | Tool | Description |
 |------|-------------|
-| `highlight_list_applications` | List all applications in a portfolio |
-| `highlight_get_application` | Get detailed application information |
-| `highlight_get_metrics` | Retrieve application health metrics |
-| `highlight_get_technologies` | Get technology breakdown for an application |
-| `highlight_cloud_readiness` | Assess cloud migration readiness |
-| `highlight_software_health` | Get overall software health score |
-
-See [docs/TOOLS.md](docs/TOOLS.md) for complete tool documentation.
+| `highlight_get_company` | Get company details including domain count, application count, and status |
+| `highlight_list_domains` | List all domains/portfolios for the company |
+| `highlight_get_domain` | Get details for a specific domain/portfolio |
+| `highlight_list_applications` | List all applications in a domain with their health metrics |
+| `highlight_get_application` | Get detailed information about a specific application |
+| `highlight_get_metrics` | Get health metrics for an application (software health, agility, elegance, resiliency) |
+| `highlight_get_technologies` | Get technology breakdown for an application (languages, frameworks, libraries) |
+| `highlight_get_cloud_readiness` | Get cloud migration readiness assessment for an application |
+| `highlight_get_green_impact` | Get environmental/green impact metrics for an application |
+| `highlight_get_cves` | Get CVE vulnerabilities affecting an application's dependencies |
+| `highlight_get_third_parties` | Get third-party/open-source components used by an application |
+| `highlight_get_benchmark` | Get benchmark statistics comparing against all CAST Highlight applications globally |
 
 ## Development
 
+### Setup
+
 ```bash
-# Run tests
-make test
+# Clone the repository
+git clone https://github.com/your-org/cast-highlight-mcp.git
+cd cast-highlight-mcp
 
-# Run linter
-make lint-fix
+# Install with dev dependencies
+pip install -e ".[dev]"
 
-# Type check
-make typecheck
-
-# All quality checks
-make quality
+# Or with uv
+uv pip install -e ".[dev]"
 ```
 
-See [CLAUDE.md](CLAUDE.md) for AI agent development instructions.
+### Commands
 
-## Documentation
+```bash
+# Run tests
+pytest
 
-- [CLAUDE.md](CLAUDE.md) - AI agent instructions
-- [docs/API.md](docs/API.md) - API reference
-- [docs/TOOLS.md](docs/TOOLS.md) - MCP tools documentation
-- [docs/DEVELOPER.md](docs/DEVELOPER.md) - Developer guide
+# Run linter
+ruff check .
+
+# Format code
+ruff format .
+```
+
+## Dependencies
+
+- `mcp>=1.0.0` - Model Context Protocol SDK
+- `httpx>=0.27.0` - Async HTTP client
+- `python-dotenv>=1.0.0` - Environment variable management
 
 ## License
 
@@ -148,7 +200,5 @@ MIT
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Run `make quality` to ensure code quality
+4. Run tests and linting
 5. Submit a pull request
-
-See [docs/DEVELOPER.md](docs/DEVELOPER.md) for detailed contribution guidelines.
