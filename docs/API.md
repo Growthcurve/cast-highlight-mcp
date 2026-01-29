@@ -12,11 +12,23 @@ https://rpa.casthighlight.com/WS2
 
 ## Authentication
 
-The CAST Highlight API uses Basic Authentication or OAuth2.
+The CAST Highlight API supports two authentication methods:
+
+### Option 1: OAuth2 Bearer Token (Recommended)
+
+```
+Authorization: Bearer {your-token}
+```
+
+Bearer tokens are the recommended method for API integrations. See the **[Token Setup Guide](./TOKEN-SETUP.md)** for complete instructions on generating and managing tokens.
+
+### Option 2: Basic Authentication
 
 ```
 Authorization: Basic {base64(username:password)}
 ```
+
+> **Note:** Basic Authentication can be disabled at the company level when token management is enabled.
 
 ---
 
