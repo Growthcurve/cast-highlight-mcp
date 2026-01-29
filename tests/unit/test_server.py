@@ -2,7 +2,7 @@
 
 import pytest
 
-from highlight_mcp.server import TOOLS, list_tools
+from cast_highlight_mcp.server import TOOLS, list_tools
 
 
 class TestToolDefinitions:

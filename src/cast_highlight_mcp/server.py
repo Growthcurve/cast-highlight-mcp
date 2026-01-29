@@ -11,7 +11,7 @@ from .client import HighlightClient
 from .config import load_config
 
 # Initialize server
-server = Server("highlight-mcp")
+server = Server("cast-highlight-mcp")
 client: HighlightClient | None = None
 
 

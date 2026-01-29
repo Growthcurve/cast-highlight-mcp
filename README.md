@@ -25,8 +25,8 @@ This MCP server wraps the CAST Highlight REST API, enabling AI agents to:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/highlight-mcp.git
-cd highlight-mcp
+git clone https://github.com/your-org/cast-highlight-mcp.git
+cd cast-highlight-mcp
 
 # Install dependencies
 npm install
@@ -70,7 +70,7 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
   "mcpServers": {
     "highlight": {
       "command": "node",
-      "args": ["/path/to/highlight-mcp/dist/index.js"],
+      "args": ["/path/to/cast-highlight-mcp/dist/index.js"],
       "env": {
         "HIGHLIGHT_DOMAIN": "your-domain.casthighlight.com",
         "HIGHLIGHT_CLIENT_ID": "your-client-id",

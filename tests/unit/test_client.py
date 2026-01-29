@@ -3,8 +3,8 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from highlight_mcp.client import HighlightClient
-from highlight_mcp.config import Config
+from cast_highlight_mcp.client import HighlightClient
+from cast_highlight_mcp.config import Config
 
 
 class TestHighlightClient:

@@ -14,7 +14,7 @@
 
 ## [P0] Project Overview
 
-**highlight-mcp** is a TypeScript MCP (Model Context Protocol) server that provides AI agents with access to CAST Highlight's application portfolio analysis and software intelligence capabilities.
+**cast-highlight-mcp** is a TypeScript MCP (Model Context Protocol) server that provides AI agents with access to CAST Highlight's application portfolio analysis and software intelligence capabilities.
 
 ### What This Project Does
 
@@ -76,7 +76,7 @@ make typecheck
 ## [P1] Project Structure
 
 ```
-highlight-mcp/
+cast-highlight-mcp/
 ├── CLAUDE.md           # This file - AI agent instructions
 ├── README.md           # Project overview and setup
 ├── Makefile            # Single-path build commands
@@ -148,7 +148,7 @@ export class HighlightClient {
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 
 const server = new Server({
-  name: "highlight-mcp",
+  name: "cast-highlight-mcp",
   version: "0.1.0",
 });
 

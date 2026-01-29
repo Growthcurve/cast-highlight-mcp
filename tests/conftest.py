@@ -2,7 +2,7 @@
 
 import pytest
 
-from highlight_mcp.config import Config
+from cast_highlight_mcp.config import Config
 
 
 @pytest.fixture

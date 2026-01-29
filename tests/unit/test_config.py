@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from highlight_mcp.config import Config, load_config
+from cast_highlight_mcp.config import Config, load_config
 
 
 class TestConfig:
@@ -61,7 +61,7 @@ class TestLoadConfig:
 
         assert config.timeout == 30
 
-    @patch("highlight_mcp.config.load_dotenv")
+    @patch("cast_highlight_mcp.config.load_dotenv")
     def test_load_config_missing_base_url(self, mock_dotenv, monkeypatch):
         """Test error when HIGHLIGHT_BASE_URL is missing."""
         monkeypatch.delenv("HIGHLIGHT_BASE_URL", raising=False)
@@ -73,7 +73,7 @@ class TestLoadConfig:
         with pytest.raises(ValueError, match="HIGHLIGHT_BASE_URL"):
             load_config()
 
-    @patch("highlight_mcp.config.load_dotenv")
+    @patch("cast_highlight_mcp.config.load_dotenv")
     def test_load_config_missing_access_token(self, mock_dotenv, monkeypatch):
         """Test error when HIGHLIGHT_ACCESS_TOKEN is missing."""
         monkeypatch.delenv("HIGHLIGHT_BASE_URL", raising=False)
@@ -85,7 +85,7 @@ class TestLoadConfig:
         with pytest.raises(ValueError, match="HIGHLIGHT_ACCESS_TOKEN"):
             load_config()
 
-    @patch("highlight_mcp.config.load_dotenv")
+    @patch("cast_highlight_mcp.config.load_dotenv")
     def test_load_config_missing_company_id(self, mock_dotenv, monkeypatch):
         """Test error when HIGHLIGHT_COMPANY_ID is missing."""
         monkeypatch.delenv("HIGHLIGHT_BASE_URL", raising=False)
