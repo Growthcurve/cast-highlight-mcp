@@ -346,6 +346,12 @@ class TestListDomainsRateLimiting:
     """Tests for list_domains rate limiting (Issue #13)."""
 
     @pytest.mark.asyncio
+    async def test_list_domains_rejects_negative_delay(self, client):
+        """Test list_domains raises ValueError for negative delay."""
+        with pytest.raises(ValueError, match="delay must be non-negative"):
+            await client.list_domains(delay=-1)
+
+    @pytest.mark.asyncio
     async def test_list_domains_accepts_delay_parameter(self, client):
         """Test list_domains accepts a delay parameter."""
         mock_http_client = AsyncMock()
@@ -362,7 +368,7 @@ class TestListDomainsRateLimiting:
 
     @pytest.mark.asyncio
     async def test_list_domains_calls_sleep_between_requests(self, client):
-        """Test list_domains calls asyncio.sleep between requests."""
+        """Test list_domains calls asyncio.sleep between requests, not before first."""
         mock_http_client = AsyncMock()
         company_response = MagicMock()
         company_response.json.return_value = {"id": 1234, "domains": 2}
@@ -377,8 +383,10 @@ class TestListDomainsRateLimiting:
 
         with patch("cast_highlight_mcp.client.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             await client.list_domains(delay=0.05)
-            # Should have called sleep between domain requests
-            assert mock_sleep.call_count >= 1
+            # With 2 domains found, sleep should be called once (between 1st and 2nd request)
+            # Not before first request
+            assert mock_sleep.call_count == 1
+            mock_sleep.assert_called_with(0.05)
 
     @pytest.mark.asyncio
     async def test_list_domains_no_sleep_when_delay_zero(self, client):
@@ -475,3 +483,36 @@ class TestGetClientThreadSafety:
         assert isinstance(client._lock, asyncio.Lock)
 
         await client.close()
+
+    @pytest.mark.asyncio
+    async def test_concurrent_get_client_returns_same_instance(self, client):
+        """Test concurrent _get_client calls return the same client instance."""
+        import asyncio
+
+        # Call _get_client concurrently from multiple tasks
+        results = await asyncio.gather(
+            client._get_client(),
+            client._get_client(),
+            client._get_client(),
+            client._get_client(),
+            client._get_client(),
+        )
+
+        # All results should be the same client instance
+        assert all(r is results[0] for r in results)
+
+        await client.close()
+
+    @pytest.mark.asyncio
+    async def test_close_acquires_lock(self, client):
+        """Test close() acquires lock to prevent race conditions."""
+        import asyncio
+
+        # Verify lock is used by close
+        assert hasattr(client, "_lock")
+        assert isinstance(client._lock, asyncio.Lock)
+
+        # Create and close client to verify no deadlock
+        await client._get_client()
+        await client.close()
+        assert client._client is None

@@ -46,9 +46,10 @@ class HighlightClient:
 
     async def close(self) -> None:
         """Close the HTTP client and release resources."""
-        if self._client:
-            await self._client.aclose()
-            self._client = None
+        async with self._lock:
+            if self._client:
+                await self._client.aclose()
+                self._client = None
 
     async def _request(self, method: str, path: str, **kwargs) -> Any:
         client = await self._get_client()
@@ -74,11 +75,24 @@ class HighlightClient:
 
         Args:
             company_id: Optional company ID (uses config default if not provided)
-            delay: Delay in seconds between requests for rate limiting (default: 0)
+            delay: Delay in seconds between requests for rate limiting (default: 0).
+                   Must be non-negative.
 
         Returns:
-            List of domain dictionaries found during scanning
+            List of domain dictionaries found during scanning. May be fewer than
+            the expected domain count if authentication or network errors occur.
+
+        Raises:
+            ValueError: If delay is negative.
+
+        Note:
+            This method scans a range of domain IDs around the company ID since
+            the API does not provide a direct list endpoint. Authentication errors
+            (401/403) are logged as warnings; network errors are logged at debug level.
         """
+        if delay < 0:
+            raise ValueError("delay must be non-negative")
+
         cid = company_id or self.config.company_id
         # Get company info to know domain count
         company = await self.get(f"/companies/{cid}")
@@ -89,13 +103,15 @@ class HighlightClient:
         client = await self._get_client()
 
         # Scan range around company ID
+        is_first_request = True
         for offset in range(-10, 50):
             if len(found_domains) >= domain_count:
                 break
 
-            # Rate limiting between requests
-            if delay > 0:
+            # Rate limiting between requests (not before first request)
+            if delay > 0 and not is_first_request:
                 await asyncio.sleep(delay)
+            is_first_request = False
 
             domain_id = cid + offset
             try:
