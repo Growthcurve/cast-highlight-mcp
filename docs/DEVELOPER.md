@@ -6,19 +6,30 @@ This guide covers development practices for contributing to the Highlight MCP Se
 
 ### Prerequisites
 
-- Node.js 20 or later
-- npm 10 or later
+- Python 3.10 or later
 - Git
 
 ### Setup
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/highlight-mcp.git
-cd highlight-mcp
+git clone https://github.com/Growthcurve/cast-highlight-mcp.git
+cd cast-highlight-mcp
+
+# Run setup (creates venv, installs deps, copies .env.example)
+make setup
+
+# Edit .env with your credentials
+```
+
+Or manually:
+
+```bash
+# Create virtual environment
+python3 -m venv .venv
 
 # Install dependencies
-npm install
+.venv/bin/pip install -e ".[dev]"
 
 # Copy environment template
 cp .env.example .env
@@ -29,140 +40,145 @@ cp .env.example .env
 ### Running Locally
 
 ```bash
-# Development mode with hot reload
-make dev
+# Run the MCP server
+make run
 
-# Or using npm
-npm run dev
+# Or directly
+.venv/bin/cast-highlight-mcp
 ```
 
 ## Project Structure
 
 ```
-src/
-├── index.ts          # Entry point
-├── server.ts         # MCP server setup
-├── config.ts         # Configuration management
-├── api/
-│   ├── client.ts     # CAST Highlight API client
-│   └── types.ts      # Type definitions
-├── tools/
-│   ├── index.ts      # Tool registry
-│   ├── list-applications.ts
-│   └── get-application.ts
-└── utils/
-    └── logger.ts     # Logging utility
+src/cast_highlight_mcp/
+├── __init__.py       # Package init
+├── server.py         # MCP server setup and tool handlers
+├── client.py         # CAST Highlight API client
+└── config.py         # Configuration management
 ```
 
 ## Adding New Tools
 
-### 1. Create Tool File
+### 1. Add Tool Definition
 
-Create a new file in `src/tools/`:
+In `src/cast_highlight_mcp/server.py`, add to the `list_tools()` function:
 
-```typescript
-// src/tools/my-new-tool.ts
-import { z } from "zod";
-import type { HighlightConfig } from "../config.js";
-import { HighlightClient } from "../api/client.js";
-
-export const myNewTool = {
-  name: "highlight_my_new_tool",
-  description: "What this tool does",
-  inputSchema: {
-    type: "object" as const,
-    properties: {
-      param1: {
-        type: "string",
-        description: "Parameter description",
-      },
-    },
-    required: ["param1"],
-  },
-};
-
-const inputSchema = z.object({
-  param1: z.string(),
-});
-
-export async function handleMyNewTool(
-  args: Record<string, unknown>,
-  config: HighlightConfig
-): Promise<{ content: Array<{ type: "text"; text: string }> }> {
-  const parsed = inputSchema.parse(args);
-  const client = new HighlightClient(config);
-
-  // Implementation here
-
-  return {
-    content: [
-      {
-        type: "text",
-        text: JSON.stringify(result, null, 2),
-      },
-    ],
-  };
-}
+```python
+@server.list_tools()
+async def list_tools() -> list[Tool]:
+    return [
+        # ... existing tools
+        Tool(
+            name="highlight_my_new_tool",
+            description="What this tool does",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "param1": {
+                        "type": "string",
+                        "description": "Parameter description",
+                    },
+                },
+                "required": ["param1"],
+            },
+        ),
+    ]
 ```
 
-### 2. Register Tool
+### 2. Add Tool Handler
 
-Update `src/tools/index.ts`:
+In `src/cast_highlight_mcp/server.py`, add to the `call_tool()` function:
 
-```typescript
-import { myNewTool, handleMyNewTool } from "./my-new-tool.js";
+```python
+@server.call_tool()
+async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+    api = get_client()
 
-export const tools = [
-  // ... existing tools
-  myNewTool,
-];
+    try:
+        # ... existing handlers
+        elif name == "highlight_my_new_tool":
+            result = await api.my_new_method(arguments["param1"])
 
-const handlers: Record<string, ToolHandler> = {
-  // ... existing handlers
-  highlight_my_new_tool: handleMyNewTool,
-};
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+    except Exception as e:
+        return [TextContent(type="text", text=f"Error: {str(e)}")]
 ```
 
-### 3. Add Tests
+### 3. Add API Client Method (if needed)
 
-Create `tests/unit/my-new-tool.test.ts`:
+In `src/cast_highlight_mcp/client.py`:
 
-```typescript
-import { describe, it, expect } from "vitest";
-import { myNewTool } from "../../src/tools/my-new-tool.js";
+```python
+class HighlightClient:
+    # ... existing methods
 
-describe("myNewTool", () => {
-  it("should have correct name", () => {
-    expect(myNewTool.name).toBe("highlight_my_new_tool");
-  });
-
-  // Add more tests
-});
+    async def my_new_method(self, param1: str) -> dict:
+        """Description of what this method does."""
+        return await self.get(f"/some/endpoint/{param1}")
 ```
 
-### 4. Update Documentation
+### 4. Add Tests
+
+Create or update tests in `tests/`:
+
+```python
+# tests/test_tools.py
+import pytest
+from cast_highlight_mcp.server import list_tools
+
+@pytest.mark.asyncio
+async def test_my_new_tool_definition():
+    tools = await list_tools()
+    tool_names = [t.name for t in tools]
+    assert "highlight_my_new_tool" in tool_names
+```
+
+```python
+# tests/test_client.py
+import pytest
+from cast_highlight_mcp.client import HighlightClient
+
+@pytest.mark.asyncio
+async def test_my_new_method(mock_client):
+    # Test implementation
+    pass
+```
+
+### 5. Update Documentation
 
 Update `docs/TOOLS.md` with the new tool documentation.
 
 ## Testing
 
-### Unit Tests
+### Run All Tests
 
 ```bash
-make test-unit
+make test
 ```
 
-### Integration Tests
-
-```bash
-# Requires valid CAST Highlight credentials
-make test-integration
-```
-
-### Coverage
+### Run Tests with Coverage
 
 ```bash
 make test-coverage
+```
+
+### Run Specific Tests
+
+```bash
+# Run a specific test file
+.venv/bin/pytest tests/test_client.py -v
+
+# Run tests matching a pattern
+.venv/bin/pytest tests/ -k "test_get_company" -v
+
+# Run with verbose output
+.venv/bin/pytest tests/ -v --tb=short
+```
+
+### Test API Connection
+
+```bash
+make test-api
 ```
 
 ## Code Quality
@@ -181,12 +197,6 @@ make lint-fix
 
 ```bash
 make format
-```
-
-### Type Checking
-
-```bash
-make typecheck
 ```
 
 ### All Quality Checks
@@ -213,20 +223,14 @@ type(scope): description
 
 Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 
-## Building
-
-```bash
-make build
-```
-
-Output is generated in `dist/` directory.
-
 ## Debugging
 
 ### Enable Debug Logging
 
-```bash
-LOG_LEVEL=debug make dev
+```python
+# In your code
+import logging
+logging.basicConfig(level=logging.DEBUG)
 ```
 
 ### Test MCP Server
@@ -234,23 +238,80 @@ LOG_LEVEL=debug make dev
 Use the MCP Inspector tool:
 
 ```bash
-npx @modelcontextprotocol/inspector node dist/index.js
+npx @modelcontextprotocol/inspector .venv/bin/cast-highlight-mcp
+```
+
+### Interactive Testing
+
+```python
+# Start Python REPL with the client
+.venv/bin/python
+
+>>> import asyncio
+>>> from cast_highlight_mcp.client import HighlightClient
+>>> from cast_highlight_mcp.config import load_config
+>>>
+>>> config = load_config()
+>>> client = HighlightClient(config)
+>>>
+>>> # Test a method
+>>> result = asyncio.run(client.get_company())
+>>> print(result)
 ```
 
 ## API Client Development
 
-When adding new API methods to `src/api/client.ts`:
+When adding new API methods to `src/cast_highlight_mcp/client.py`:
 
-1. Add return types to `src/api/types.ts`
-2. Implement the method using the `request` helper
-3. Add error handling
-4. Add tests
+1. Add the method with proper type hints
+2. Use the existing `get()`, `post()`, etc. helper methods
+3. Add error handling as appropriate
+4. Add tests in `tests/test_client.py`
+
+### Example API Method
+
+```python
+async def get_something(self, domain_id: int, app_id: int) -> dict:
+    """Get something for an application.
+
+    Args:
+        domain_id: The domain ID
+        app_id: The application ID
+
+    Returns:
+        Dict containing something data
+    """
+    return await self.get(f"/domains/{domain_id}/applications/{app_id}/something")
+```
 
 ## Release Process
 
-1. Update version in `package.json`
-2. Update CHANGELOG.md
+1. Update version in `pyproject.toml`
+2. Update CHANGELOG.md (if exists)
 3. Run `make quality`
 4. Create release commit
-5. Tag the release
-6. Push to main
+5. Tag the release: `git tag v0.x.x`
+6. Push to main: `git push origin main --tags`
+
+## Common Issues
+
+### Import Errors
+
+Make sure you're using the virtual environment:
+
+```bash
+source .venv/bin/activate
+# or use .venv/bin/python directly
+```
+
+### API Authentication Errors
+
+1. Check `.env` file has correct credentials
+2. Verify token hasn't expired
+3. Test with `make test-api`
+
+### Test Failures
+
+1. Ensure dependencies are installed: `make install`
+2. Check for syntax errors: `make lint`
+3. Run specific failing test with `-v` flag for details

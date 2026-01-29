@@ -8,39 +8,101 @@ All tools are prefixed with `highlight_` to clearly identify them as CAST Highli
 
 ## Available Tools
 
-### highlight_list_applications
+### highlight_get_company
 
-List all applications in a CAST Highlight portfolio.
+Get company details including domain count, application count, and status.
 
 **Input Schema:**
 ```json
 {
   "type": "object",
   "properties": {
-    "domainId": {
-      "type": "string",
-      "description": "The domain ID to list applications from. If not provided, uses the default domain."
-    },
-    "limit": {
-      "type": "number",
-      "description": "Maximum number of applications to return. Default is 100."
-    },
-    "offset": {
-      "type": "number",
-      "description": "Number of applications to skip for pagination. Default is 0."
+    "company_id": {
+      "type": "integer",
+      "description": "Company ID (optional, uses default from config)"
     }
-  },
-  "required": []
+  }
 }
 ```
 
 **Example Usage:**
 ```
-List all applications in my portfolio
+Get my company details
 ```
 
-**Response:**
-Returns a paginated list of applications with their IDs, names, and basic metadata.
+---
+
+### highlight_list_domains
+
+List all domains/portfolios for the company.
+
+**Input Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "company_id": {
+      "type": "integer",
+      "description": "Company ID (optional, uses default from config)"
+    }
+  }
+}
+```
+
+**Example Usage:**
+```
+List all domains in my portfolio
+```
+
+---
+
+### highlight_get_domain
+
+Get details for a specific domain/portfolio.
+
+**Input Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "domain_id": {
+      "type": "integer",
+      "description": "Domain ID"
+    }
+  },
+  "required": ["domain_id"]
+}
+```
+
+**Example Usage:**
+```
+Get details for domain 12345
+```
+
+---
+
+### highlight_list_applications
+
+List all applications in a domain with their health metrics.
+
+**Input Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "domain_id": {
+      "type": "integer",
+      "description": "Domain ID"
+    }
+  },
+  "required": ["domain_id"]
+}
+```
+
+**Example Usage:**
+```
+List all applications in domain 12345
+```
 
 ---
 
@@ -53,47 +115,190 @@ Get detailed information about a specific application.
 {
   "type": "object",
   "properties": {
-    "applicationId": {
-      "type": "string",
-      "description": "The unique identifier of the application."
-    },
-    "includeMetrics": {
-      "type": "boolean",
-      "description": "Whether to include health metrics. Default is true."
-    },
-    "includeTechnologies": {
-      "type": "boolean",
-      "description": "Whether to include technology breakdown. Default is true."
+    "application_id": {
+      "type": "integer",
+      "description": "Application ID"
     }
   },
-  "required": ["applicationId"]
+  "required": ["application_id"]
 }
 ```
 
 **Example Usage:**
 ```
-Get details for application app-12345
+Get details for application 67890
 ```
-
-**Response:**
-Returns comprehensive application information including metrics, technologies, and health scores.
 
 ---
 
-## Planned Tools
+### highlight_get_metrics
 
-### Phase 2
+Get health metrics for an application (software health, agility, elegance, resiliency).
 
-- **highlight_cloud_readiness** - Assess cloud migration readiness for an application
-- **highlight_green_impact** - Get environmental impact metrics
-- **highlight_software_health** - Get overall software health assessment
-- **highlight_technical_debt** - Analyze technical debt
+**Input Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "application_id": {
+      "type": "integer",
+      "description": "Application ID"
+    }
+  },
+  "required": ["application_id"]
+}
+```
 
-### Phase 3
+**Example Usage:**
+```
+Get health metrics for application 67890
+```
 
-- **highlight_compare_applications** - Compare metrics across multiple applications
-- **highlight_trend_analysis** - Get historical trend data
-- **highlight_recommendations** - Get AI-powered recommendations
+---
+
+### highlight_get_technologies
+
+Get technology breakdown for an application (languages, frameworks, libraries).
+
+**Input Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "application_id": {
+      "type": "integer",
+      "description": "Application ID"
+    }
+  },
+  "required": ["application_id"]
+}
+```
+
+**Example Usage:**
+```
+What technologies does application 67890 use?
+```
+
+---
+
+### highlight_get_cloud_readiness
+
+Get cloud migration readiness assessment for an application.
+
+**Input Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "application_id": {
+      "type": "integer",
+      "description": "Application ID"
+    }
+  },
+  "required": ["application_id"]
+}
+```
+
+**Example Usage:**
+```
+Is application 67890 ready for cloud migration?
+```
+
+---
+
+### highlight_get_green_impact
+
+Get environmental/green impact metrics for an application.
+
+**Input Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "application_id": {
+      "type": "integer",
+      "description": "Application ID"
+    }
+  },
+  "required": ["application_id"]
+}
+```
+
+**Example Usage:**
+```
+What's the green impact score for application 67890?
+```
+
+---
+
+### highlight_get_cves
+
+Get CVE vulnerabilities affecting an application's dependencies.
+
+**Input Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "application_id": {
+      "type": "integer",
+      "description": "Application ID"
+    }
+  },
+  "required": ["application_id"]
+}
+```
+
+**Example Usage:**
+```
+Show CVE vulnerabilities for application 67890
+```
+
+---
+
+### highlight_get_third_parties
+
+Get third-party/open-source components used by an application.
+
+**Input Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "application_id": {
+      "type": "integer",
+      "description": "Application ID"
+    }
+  },
+  "required": ["application_id"]
+}
+```
+
+**Example Usage:**
+```
+What open source components does application 67890 use?
+```
+
+---
+
+### highlight_get_benchmark
+
+Get benchmark statistics comparing against all CAST Highlight applications globally.
+
+**Input Schema:**
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+**Example Usage:**
+```
+Show global benchmark statistics
+```
+
+---
 
 ## Error Handling
 
@@ -104,7 +309,7 @@ All tools return errors in a consistent format:
   "content": [
     {
       "type": "text",
-      "text": "Error executing highlight_get_application: Application not found"
+      "text": "Error: Application not found"
     }
   ]
 }
@@ -112,7 +317,8 @@ All tools return errors in a consistent format:
 
 ## Best Practices
 
-1. **Pagination**: Use `limit` and `offset` for large portfolios
-2. **Selective Loading**: Use `includeMetrics: false` when you only need basic info
-3. **Caching**: Results are cached based on `HIGHLIGHT_CACHE_TTL` setting
-4. **Error Handling**: Always handle potential errors in tool responses
+1. **Start with Company**: Use `highlight_get_company` to get your company ID and see available domains
+2. **List Domains**: Use `highlight_list_domains` to discover available portfolios
+3. **List Applications**: Use `highlight_list_applications` with a domain ID to see applications
+4. **Deep Dive**: Use specific tools (`highlight_get_metrics`, `highlight_get_cves`, etc.) for detailed analysis
+5. **Error Handling**: Always handle potential errors in tool responses
