@@ -61,13 +61,6 @@ HIGHLIGHT_ACCESS_TOKEN=your-access-token
 HIGHLIGHT_COMPANY_ID=12345
 ```
 
-### Running
-
-```bash
-# Run the MCP server
-cast-highlight-mcp
-```
-
 ## MCP Integration
 
 ### Claude Desktop
