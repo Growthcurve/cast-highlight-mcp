@@ -68,9 +68,7 @@ class HighlightClient:
         return await self.get(f"/companies/{cid}")
 
     # Domain endpoints
-    async def list_domains(
-        self, company_id: int | None = None, delay: float = 0
-    ) -> list[dict]:
+    async def list_domains(self, company_id: int | None = None, delay: float = 0) -> list[dict]:
         """List all domains for a company by scanning accessible domain IDs.
 
         Args:
