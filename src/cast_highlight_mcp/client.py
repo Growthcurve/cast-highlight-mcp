@@ -1,10 +1,14 @@
 """CAST Highlight API client."""
 
+import asyncio
+import logging
 from typing import Any
 
 import httpx
 
 from .config import Config
+
+logger = logging.getLogger(__name__)
 
 
 class HighlightClient:
@@ -14,6 +18,7 @@ class HighlightClient:
         self.config = config
         self.base_url = config.base_url.rstrip("/")
         self._client: httpx.AsyncClient | None = None
+        self._lock = asyncio.Lock()
 
     async def __aenter__(self) -> "HighlightClient":
         """Enter async context manager."""
@@ -31,12 +36,13 @@ class HighlightClient:
         }
 
     async def _get_client(self) -> httpx.AsyncClient:
-        if self._client is None:
-            self._client = httpx.AsyncClient(
-                timeout=self.config.timeout,
-                headers=self.headers,
-            )
-        return self._client
+        async with self._lock:
+            if self._client is None:
+                self._client = httpx.AsyncClient(
+                    timeout=self.config.timeout,
+                    headers=self.headers,
+                )
+            return self._client
 
     async def close(self) -> None:
         """Close the HTTP client and release resources."""
@@ -61,29 +67,57 @@ class HighlightClient:
         return await self.get(f"/companies/{cid}")
 
     # Domain endpoints
-    async def list_domains(self, company_id: int | None = None) -> list[dict]:
-        """List all domains for a company by scanning accessible domain IDs."""
+    async def list_domains(
+        self, company_id: int | None = None, delay: float = 0
+    ) -> list[dict]:
+        """List all domains for a company by scanning accessible domain IDs.
+
+        Args:
+            company_id: Optional company ID (uses config default if not provided)
+            delay: Delay in seconds between requests for rate limiting (default: 0)
+
+        Returns:
+            List of domain dictionaries found during scanning
+        """
         cid = company_id or self.config.company_id
         # Get company info to know domain count
         company = await self.get(f"/companies/{cid}")
         domain_count = company.get("domains", 0)
 
         # Scan for domains near company ID (API doesn't have list endpoint)
-        found_domains = []
+        found_domains: list[dict] = []
         client = await self._get_client()
 
         # Scan range around company ID
         for offset in range(-10, 50):
             if len(found_domains) >= domain_count:
                 break
+
+            # Rate limiting between requests
+            if delay > 0:
+                await asyncio.sleep(delay)
+
             domain_id = cid + offset
             try:
                 url = f"{self.base_url}/domains/{domain_id}"
                 response = await client.get(url)
                 if response.status_code == 200:
                     found_domains.append(response.json())
-            except Exception:
-                pass
+                elif response.status_code in (401, 403):
+                    logger.warning(
+                        "Authentication error scanning domain %d: %d",
+                        domain_id,
+                        response.status_code,
+                    )
+                # 404 is expected during scanning, don't log
+            except httpx.TimeoutException as e:
+                logger.debug("Timeout scanning domain %d: %s", domain_id, e)
+            except httpx.ConnectError as e:
+                logger.debug("Connection error scanning domain %d: %s", domain_id, e)
+            except httpx.RequestError as e:
+                logger.debug("Request error scanning domain %d: %s", domain_id, e)
+            except Exception as e:
+                logger.debug("Unexpected error scanning domain %d: %s", domain_id, e)
 
         return found_domains
 
