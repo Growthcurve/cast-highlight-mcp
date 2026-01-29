@@ -41,6 +41,8 @@ pip install -e .
 
 ### Configuration
 
+To generate an API access token, see [CAST Highlight Token Management](https://help.castsoftware.com/hc/en-us/articles/19264005200402-CAST-HIGHLIGHT-Token-Management-API-Access-Token-Token-expires-in-N-A-minutes-Call-API-using-header-Authorization-Bearer-your-token).
+
 Set the following environment variables:
 
 ```bash
