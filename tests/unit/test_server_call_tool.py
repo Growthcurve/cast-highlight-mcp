@@ -21,9 +21,7 @@ class TestGetClient:
         mock_client_class = MagicMock()
 
         with patch("cast_highlight_mcp.server.load_config", return_value=mock_config):
-            with patch(
-                "cast_highlight_mcp.server.HighlightClient", mock_client_class
-            ) as mock_hl:
+            with patch("cast_highlight_mcp.server.HighlightClient", mock_client_class) as mock_hl:
                 result = get_client()
 
                 mock_hl.assert_called_once_with(mock_config)

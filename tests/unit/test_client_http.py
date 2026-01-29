@@ -147,9 +147,7 @@ class TestGetMethod:
     @pytest.mark.asyncio
     async def test_get_calls_request_with_get_method(self, client):
         """Test get() calls _request with GET method."""
-        with patch.object(
-            client, "_request", new_callable=AsyncMock
-        ) as mock_request:
+        with patch.object(client, "_request", new_callable=AsyncMock) as mock_request:
             mock_request.return_value = {"result": "data"}
 
             result = await client.get("/companies/1")
@@ -160,16 +158,12 @@ class TestGetMethod:
     @pytest.mark.asyncio
     async def test_get_passes_kwargs(self, client):
         """Test get() passes kwargs to _request."""
-        with patch.object(
-            client, "_request", new_callable=AsyncMock
-        ) as mock_request:
+        with patch.object(client, "_request", new_callable=AsyncMock) as mock_request:
             mock_request.return_value = {}
 
             await client.get("/search", params={"q": "test"})
 
-            mock_request.assert_called_once_with(
-                "GET", "/search", params={"q": "test"}
-            )
+            mock_request.assert_called_once_with("GET", "/search", params={"q": "test"})
 
 
 class TestListDomainsScanning:
