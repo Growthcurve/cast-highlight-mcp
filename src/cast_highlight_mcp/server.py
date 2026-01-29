@@ -28,9 +28,7 @@ def get_client() -> HighlightClient:
         RuntimeError: If called before client is initialized.
     """
     if _client is None:
-        raise RuntimeError(
-            "Client not initialized. Server must be started with run_server()."
-        )
+        raise RuntimeError("Client not initialized. Server must be started with run_server().")
     return _client
 
 

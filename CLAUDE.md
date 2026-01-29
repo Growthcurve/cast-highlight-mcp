@@ -33,7 +33,7 @@
 | HTTP Client | httpx |
 | Config | python-dotenv |
 | Test | pytest, pytest-asyncio |
-| Lint | ruff |
+| Lint | ruff, pre-commit |
 
 ---
 
@@ -42,7 +42,8 @@
 ### Setup
 
 ```bash
-make setup          # Create venv, install deps, copy .env.example
+make setup          # Create venv, install deps, install pre-commit hooks
+make hooks          # Install pre-commit hooks only (runs on every commit)
 ```
 
 ### Build/Install

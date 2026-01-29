@@ -28,7 +28,7 @@ async def main():
 
         # Test benchmark
         bench = await client.get_benchmark()
-        print(f"\n✓ Benchmark data available")
+        print("\n✓ Benchmark data available")
         print(f"  Sample size: {bench['sampleSize']} applications")
 
         print("\n✓ All API tests passed!")

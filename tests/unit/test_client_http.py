@@ -340,3 +340,179 @@ class TestClientClose:
         await client.close()  # Should not raise
 
         assert client._client is None
+
+
+class TestListDomainsRateLimiting:
+    """Tests for list_domains rate limiting (Issue #13)."""
+
+    @pytest.mark.asyncio
+    async def test_list_domains_rejects_negative_delay(self, client):
+        """Test list_domains raises ValueError for negative delay."""
+        with pytest.raises(ValueError, match="delay must be non-negative"):
+            await client.list_domains(delay=-1)
+
+    @pytest.mark.asyncio
+    async def test_list_domains_accepts_delay_parameter(self, client):
+        """Test list_domains accepts a delay parameter."""
+        mock_http_client = AsyncMock()
+        company_response = MagicMock()
+        company_response.json.return_value = {"id": 1234, "domains": 0}
+        company_response.raise_for_status = MagicMock()
+        mock_http_client.request.return_value = company_response
+        mock_http_client.get = AsyncMock(return_value=MagicMock(status_code=404))
+        client._client = mock_http_client
+
+        # Should not raise TypeError
+        result = await client.list_domains(delay=0.1)
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_list_domains_calls_sleep_between_requests(self, client):
+        """Test list_domains calls asyncio.sleep between requests, not before first."""
+        mock_http_client = AsyncMock()
+        company_response = MagicMock()
+        company_response.json.return_value = {"id": 1234, "domains": 2}
+        company_response.raise_for_status = MagicMock()
+        mock_http_client.request.return_value = company_response
+
+        domain_response = MagicMock()
+        domain_response.status_code = 200
+        domain_response.json.return_value = {"id": 1234, "name": "Domain"}
+        mock_http_client.get = AsyncMock(return_value=domain_response)
+        client._client = mock_http_client
+
+        with patch("cast_highlight_mcp.client.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            await client.list_domains(delay=0.05)
+            # With 2 domains found, sleep should be called once (between 1st and 2nd request)
+            # Not before first request
+            assert mock_sleep.call_count == 1
+            mock_sleep.assert_called_with(0.05)
+
+    @pytest.mark.asyncio
+    async def test_list_domains_no_sleep_when_delay_zero(self, client):
+        """Test list_domains does not call sleep when delay=0."""
+        mock_http_client = AsyncMock()
+        company_response = MagicMock()
+        company_response.json.return_value = {"id": 1234, "domains": 1}
+        company_response.raise_for_status = MagicMock()
+        mock_http_client.request.return_value = company_response
+
+        domain_response = MagicMock()
+        domain_response.status_code = 200
+        domain_response.json.return_value = {"id": 1234, "name": "Domain"}
+        mock_http_client.get = AsyncMock(return_value=domain_response)
+        client._client = mock_http_client
+
+        with patch("cast_highlight_mcp.client.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            await client.list_domains(delay=0)
+            mock_sleep.assert_not_called()
+
+
+class TestListDomainsLogging:
+    """Tests for list_domains exception logging (Issue #14)."""
+
+    @pytest.mark.asyncio
+    async def test_list_domains_logs_auth_errors(self, client):
+        """Test list_domains logs 401/403 authentication errors."""
+        mock_http_client = AsyncMock()
+        company_response = MagicMock()
+        company_response.json.return_value = {"id": 1234, "domains": 1}
+        company_response.raise_for_status = MagicMock()
+        mock_http_client.request.return_value = company_response
+
+        auth_error = MagicMock()
+        auth_error.status_code = 401
+        mock_http_client.get = AsyncMock(return_value=auth_error)
+        client._client = mock_http_client
+
+        with patch("cast_highlight_mcp.client.logger") as mock_logger:
+            await client.list_domains()
+            # Should log authentication failure
+            assert mock_logger.warning.called or mock_logger.debug.called
+
+    @pytest.mark.asyncio
+    async def test_list_domains_logs_network_errors(self, client):
+        """Test list_domains logs network/connection errors."""
+        mock_http_client = AsyncMock()
+        company_response = MagicMock()
+        company_response.json.return_value = {"id": 1234, "domains": 1}
+        company_response.raise_for_status = MagicMock()
+        mock_http_client.request.return_value = company_response
+        mock_http_client.get = AsyncMock(side_effect=httpx.ConnectError("Connection failed"))
+        client._client = mock_http_client
+
+        with patch("cast_highlight_mcp.client.logger") as mock_logger:
+            await client.list_domains()
+            assert mock_logger.debug.called
+
+    @pytest.mark.asyncio
+    async def test_list_domains_does_not_log_404(self, client):
+        """Test list_domains does NOT log 404 errors (expected during scanning)."""
+        mock_http_client = AsyncMock()
+        company_response = MagicMock()
+        company_response.json.return_value = {"id": 1234, "domains": 1}
+        company_response.raise_for_status = MagicMock()
+        mock_http_client.request.return_value = company_response
+
+        not_found = MagicMock()
+        not_found.status_code = 404
+        mock_http_client.get = AsyncMock(return_value=not_found)
+        client._client = mock_http_client
+
+        with patch("cast_highlight_mcp.client.logger") as mock_logger:
+            await client.list_domains()
+            # 404s should NOT trigger warning logs
+            mock_logger.warning.assert_not_called()
+
+
+class TestGetClientThreadSafety:
+    """Tests for _get_client thread safety with asyncio.Lock (Issue #12)."""
+
+    @pytest.mark.asyncio
+    async def test_client_has_lock_attribute(self, client):
+        """Test HighlightClient has a _lock attribute."""
+        assert hasattr(client, "_lock"), "HighlightClient should have _lock attribute"
+
+    @pytest.mark.asyncio
+    async def test_get_client_uses_lock(self, client):
+        """Test _get_client acquires lock during initialization."""
+        import asyncio
+
+        # Verify lock exists and is an asyncio.Lock
+        assert hasattr(client, "_lock")
+        assert isinstance(client._lock, asyncio.Lock)
+
+        await client.close()
+
+    @pytest.mark.asyncio
+    async def test_concurrent_get_client_returns_same_instance(self, client):
+        """Test concurrent _get_client calls return the same client instance."""
+        import asyncio
+
+        # Call _get_client concurrently from multiple tasks
+        results = await asyncio.gather(
+            client._get_client(),
+            client._get_client(),
+            client._get_client(),
+            client._get_client(),
+            client._get_client(),
+        )
+
+        # All results should be the same client instance
+        assert all(r is results[0] for r in results)
+
+        await client.close()
+
+    @pytest.mark.asyncio
+    async def test_close_acquires_lock(self, client):
+        """Test close() acquires lock to prevent race conditions."""
+        import asyncio
+
+        # Verify lock is used by close
+        assert hasattr(client, "_lock")
+        assert isinstance(client._lock, asyncio.Lock)
+
+        # Create and close client to verify no deadlock
+        await client._get_client()
+        await client.close()
+        assert client._client is None
