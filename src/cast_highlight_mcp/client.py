@@ -2,13 +2,15 @@
 
 import asyncio
 import logging
+import time
 from typing import Any
 
 import httpx
 
 from .config import Config
+from .observability import get_current_context, get_logger, get_metrics_collector
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class HighlightClient:
@@ -52,11 +54,135 @@ class HighlightClient:
                 self._client = None
 
     async def _request(self, method: str, path: str, **kwargs) -> Any:
-        client = await self._get_client()
-        url = f"{self.base_url}{path}"
-        response = await client.request(method, url, **kwargs)
-        response.raise_for_status()
-        return response.json()
+        """Make an HTTP request to the CAST Highlight API.
+
+        Includes structured logging and metrics collection for observability.
+        Observability operations use graceful degradation - they will not cause
+        request failures if they encounter errors.
+
+        Args:
+            method: HTTP method (GET, POST, etc.)
+            path: API path (e.g., "/companies/123")
+            **kwargs: Additional arguments passed to httpx.request
+
+        Returns:
+            Parsed JSON response
+
+        Raises:
+            httpx.HTTPStatusError: For 4xx/5xx responses
+            httpx.RequestError: For connection/timeout errors
+        """
+        # Get current context for request correlation (with graceful degradation)
+        try:
+            ctx = get_current_context()
+            request_id = ctx.request_id if ctx else "no-context"
+        except Exception:
+            request_id = "no-context"
+
+        # Log request start (DEBUG level) - graceful degradation
+        try:
+            logger.debug(
+                "HTTP request started",
+                extra={
+                    "context": {
+                        "method": method,
+                        "path": path,
+                        "request_id": request_id,
+                    }
+                },
+            )
+        except Exception:
+            pass  # Logging should never break the request
+
+        start_time = time.perf_counter()
+
+        try:
+            client = await self._get_client()
+            url = f"{self.base_url}{path}"
+            response = await client.request(method, url, **kwargs)
+
+            # Calculate duration
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            status_code = response.status_code
+
+            # Determine log level based on status code
+            if 200 <= status_code < 300:
+                log_level = logging.DEBUG
+            elif 400 <= status_code < 500:
+                log_level = logging.WARNING
+            else:  # 5xx
+                log_level = logging.ERROR
+
+            # Log completion - graceful degradation
+            try:
+                logger.log(
+                    log_level,
+                    "HTTP request completed",
+                    extra={
+                        "context": {
+                            "method": method,
+                            "path": path,
+                            "status_code": status_code,
+                            "duration_ms": round(duration_ms, 2),
+                            "request_id": request_id,
+                        }
+                    },
+                )
+            except Exception:
+                pass
+
+            # Record HTTP metrics - graceful degradation
+            try:
+                metrics = get_metrics_collector()
+                metrics.record_http_request(method, status_code, duration_ms)
+            except Exception:
+                pass
+
+            response.raise_for_status()
+            return response.json()
+
+        except httpx.TimeoutException:
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            try:
+                logger.warning(
+                    "HTTP request timeout",
+                    extra={
+                        "context": {
+                            "method": method,
+                            "path": path,
+                            "duration_ms": round(duration_ms, 2),
+                            "error_type": "timeout",
+                            "request_id": request_id,
+                        }
+                    },
+                )
+            except Exception:
+                pass
+            raise
+
+        except httpx.HTTPStatusError:
+            # Already logged above with status code, just re-raise
+            raise
+
+        except httpx.RequestError as e:
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            try:
+                logger.error(
+                    "HTTP request failed",
+                    extra={
+                        "context": {
+                            "method": method,
+                            "path": path,
+                            "duration_ms": round(duration_ms, 2),
+                            "error_type": type(e).__name__,
+                            "error_message": str(e),
+                            "request_id": request_id,
+                        }
+                    },
+                )
+            except Exception:
+                pass
+            raise
 
     async def get(self, path: str, **kwargs) -> Any:
         return await self._request("GET", path, **kwargs)
@@ -112,6 +238,10 @@ class HighlightClient:
             is_first_request = False
 
             domain_id = cid + offset
+            # Get request context for correlation
+            ctx = get_current_context()
+            request_id = ctx.request_id if ctx else "no-context"
+
             try:
                 url = f"{self.base_url}/domains/{domain_id}"
                 response = await client.get(url)
@@ -119,19 +249,64 @@ class HighlightClient:
                     found_domains.append(response.json())
                 elif response.status_code in (401, 403):
                     logger.warning(
-                        "Authentication error scanning domain %d: %d",
-                        domain_id,
-                        response.status_code,
+                        "Authentication error scanning domain",
+                        extra={
+                            "context": {
+                                "domain_id": domain_id,
+                                "status_code": response.status_code,
+                                "request_id": request_id,
+                            }
+                        },
                     )
                 # 404 is expected during scanning, don't log
             except httpx.TimeoutException as e:
-                logger.debug("Timeout scanning domain %d: %s", domain_id, e)
+                logger.debug(
+                    "Timeout scanning domain",
+                    extra={
+                        "context": {
+                            "domain_id": domain_id,
+                            "error_type": "timeout",
+                            "error_message": str(e),
+                            "request_id": request_id,
+                        }
+                    },
+                )
             except httpx.ConnectError as e:
-                logger.debug("Connection error scanning domain %d: %s", domain_id, e)
+                logger.debug(
+                    "Connection error scanning domain",
+                    extra={
+                        "context": {
+                            "domain_id": domain_id,
+                            "error_type": "ConnectError",
+                            "error_message": str(e),
+                            "request_id": request_id,
+                        }
+                    },
+                )
             except httpx.RequestError as e:
-                logger.debug("Request error scanning domain %d: %s", domain_id, e)
+                logger.debug(
+                    "Request error scanning domain",
+                    extra={
+                        "context": {
+                            "domain_id": domain_id,
+                            "error_type": type(e).__name__,
+                            "error_message": str(e),
+                            "request_id": request_id,
+                        }
+                    },
+                )
             except Exception as e:
-                logger.debug("Unexpected error scanning domain %d: %s", domain_id, e)
+                logger.debug(
+                    "Unexpected error scanning domain",
+                    extra={
+                        "context": {
+                            "domain_id": domain_id,
+                            "error_type": type(e).__name__,
+                            "error_message": str(e),
+                            "request_id": request_id,
+                        }
+                    },
+                )
 
         return found_domains
 

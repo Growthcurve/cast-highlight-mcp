@@ -86,6 +86,7 @@ class TestRequestMethod:
     async def test_request_makes_http_call(self, client):
         """Test _request makes HTTP request to correct URL."""
         mock_response = MagicMock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {"data": "test"}
         mock_response.raise_for_status = MagicMock()
 
@@ -106,6 +107,7 @@ class TestRequestMethod:
     async def test_request_passes_kwargs(self, client):
         """Test _request passes additional kwargs to httpx."""
         mock_response = MagicMock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {}
         mock_response.raise_for_status = MagicMock()
 
@@ -126,6 +128,7 @@ class TestRequestMethod:
     async def test_request_raises_http_status_error(self, client):
         """Test _request raises HTTPStatusError on bad status."""
         mock_response = MagicMock()
+        mock_response.status_code = 404
         mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
             "404 Not Found",
             request=MagicMock(),
@@ -176,6 +179,7 @@ class TestListDomainsScanning:
 
         # Company response with 2 domains
         company_response = MagicMock()
+        company_response.status_code = 200
         company_response.json.return_value = {"id": 1234, "domains": 2}
         company_response.raise_for_status = MagicMock()
 
@@ -220,6 +224,7 @@ class TestListDomainsScanning:
         mock_http_client = AsyncMock()
 
         company_response = MagicMock()
+        company_response.status_code = 200
         company_response.json.return_value = {"id": 5678, "domains": 0}
         company_response.raise_for_status = MagicMock()
 
@@ -242,6 +247,7 @@ class TestListDomainsScanning:
         mock_http_client = AsyncMock()
 
         company_response = MagicMock()
+        company_response.status_code = 200
         company_response.json.return_value = {"id": 1234, "domains": 1}
         company_response.raise_for_status = MagicMock()
 
@@ -262,6 +268,7 @@ class TestListDomainsScanning:
         mock_http_client = AsyncMock()
 
         company_response = MagicMock()
+        company_response.status_code = 200
         company_response.json.return_value = {"id": 1234, "domains": 1}
         company_response.raise_for_status = MagicMock()
 
@@ -356,6 +363,7 @@ class TestListDomainsRateLimiting:
         """Test list_domains accepts a delay parameter."""
         mock_http_client = AsyncMock()
         company_response = MagicMock()
+        company_response.status_code = 200
         company_response.json.return_value = {"id": 1234, "domains": 0}
         company_response.raise_for_status = MagicMock()
         mock_http_client.request.return_value = company_response
@@ -371,6 +379,7 @@ class TestListDomainsRateLimiting:
         """Test list_domains calls asyncio.sleep between requests, not before first."""
         mock_http_client = AsyncMock()
         company_response = MagicMock()
+        company_response.status_code = 200
         company_response.json.return_value = {"id": 1234, "domains": 2}
         company_response.raise_for_status = MagicMock()
         mock_http_client.request.return_value = company_response
@@ -393,6 +402,7 @@ class TestListDomainsRateLimiting:
         """Test list_domains does not call sleep when delay=0."""
         mock_http_client = AsyncMock()
         company_response = MagicMock()
+        company_response.status_code = 200
         company_response.json.return_value = {"id": 1234, "domains": 1}
         company_response.raise_for_status = MagicMock()
         mock_http_client.request.return_value = company_response
@@ -416,6 +426,7 @@ class TestListDomainsLogging:
         """Test list_domains logs 401/403 authentication errors."""
         mock_http_client = AsyncMock()
         company_response = MagicMock()
+        company_response.status_code = 200
         company_response.json.return_value = {"id": 1234, "domains": 1}
         company_response.raise_for_status = MagicMock()
         mock_http_client.request.return_value = company_response
@@ -435,6 +446,7 @@ class TestListDomainsLogging:
         """Test list_domains logs network/connection errors."""
         mock_http_client = AsyncMock()
         company_response = MagicMock()
+        company_response.status_code = 200
         company_response.json.return_value = {"id": 1234, "domains": 1}
         company_response.raise_for_status = MagicMock()
         mock_http_client.request.return_value = company_response
@@ -450,6 +462,7 @@ class TestListDomainsLogging:
         """Test list_domains does NOT log 404 errors (expected during scanning)."""
         mock_http_client = AsyncMock()
         company_response = MagicMock()
+        company_response.status_code = 200
         company_response.json.return_value = {"id": 1234, "domains": 1}
         company_response.raise_for_status = MagicMock()
         mock_http_client.request.return_value = company_response
