@@ -306,42 +306,284 @@ class TestCallToolErrorHandling:
         assert "Unknown tool: unknown_tool" in result[0].text
 
     @pytest.mark.asyncio
-    async def test_exception_returns_error_message(self):
-        """Test exception is caught and returns error message."""
+    async def test_exception_returns_sanitized_error_message(self):
+        """Test generic exception is caught and returns sanitized error message."""
         mock_client = AsyncMock()
-        mock_client.get_company.side_effect = Exception("API connection failed")
+        mock_client.get_company.side_effect = Exception("API connection failed with sensitive URL")
 
         with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
             result = await call_tool("highlight_get_company", {})
 
         assert len(result) == 1
-        assert "Error: API connection failed" in result[0].text
+        # Should NOT contain the raw exception message
+        assert "API connection failed" not in result[0].text
+        assert "sensitive URL" not in result[0].text
+        # Should contain the sanitized message
+        assert "An unexpected error occurred" in result[0].text
 
     @pytest.mark.asyncio
-    async def test_key_error_for_missing_required_argument(self):
-        """Test KeyError for missing required argument is caught."""
+    async def test_key_error_returns_sanitized_message(self):
+        """Test KeyError for missing required argument returns sanitized message."""
         mock_client = AsyncMock()
 
         with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
             result = await call_tool("highlight_get_domain", {})
 
         assert len(result) == 1
-        assert "Error:" in result[0].text
+        assert "Missing required argument: domain_id" in result[0].text
 
     @pytest.mark.asyncio
-    async def test_http_error_is_caught(self):
-        """Test HTTP errors are caught and returned as error message."""
+    async def test_http_404_error_returns_sanitized_message(self):
+        """Test HTTP 404 error returns sanitized message without URL details."""
         import httpx
+
+        mock_request = MagicMock()
+        mock_request.url = "https://api.example.com/sensitive/path/with/tokens"
+        mock_response = MagicMock(status_code=404)
 
         mock_client = AsyncMock()
         mock_client.get_application.side_effect = httpx.HTTPStatusError(
-            "404 Not Found",
-            request=MagicMock(),
-            response=MagicMock(status_code=404),
+            "404 Not Found for url: https://api.example.com/sensitive/path",
+            request=mock_request,
+            response=mock_response,
         )
 
         with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
             result = await call_tool("highlight_get_application", {"application_id": 99999})
 
         assert len(result) == 1
-        assert "Error:" in result[0].text
+        # Should NOT contain URL or sensitive details
+        assert "example.com" not in result[0].text
+        assert "sensitive" not in result[0].text
+        # Should contain sanitized message
+        assert "API error: Resource not found (404)" in result[0].text
+
+    @pytest.mark.asyncio
+    async def test_http_401_error_returns_sanitized_message(self):
+        """Test HTTP 401 error returns sanitized authentication error."""
+        import httpx
+
+        mock_client = AsyncMock()
+        mock_client.get_company.side_effect = httpx.HTTPStatusError(
+            "401 Unauthorized: Invalid token xyz123",
+            request=MagicMock(),
+            response=MagicMock(status_code=401),
+        )
+
+        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
+            result = await call_tool("highlight_get_company", {})
+
+        assert len(result) == 1
+        assert "xyz123" not in result[0].text  # Token should not leak
+        assert "API error: Authentication failed (401)" in result[0].text
+
+    @pytest.mark.asyncio
+    async def test_http_500_error_returns_sanitized_message(self):
+        """Test HTTP 500 error returns sanitized server error."""
+        import httpx
+
+        mock_client = AsyncMock()
+        mock_client.get_company.side_effect = httpx.HTTPStatusError(
+            "500 Internal Server Error: Database connection string exposed",
+            request=MagicMock(),
+            response=MagicMock(status_code=500),
+        )
+
+        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
+            result = await call_tool("highlight_get_company", {})
+
+        assert len(result) == 1
+        assert "Database" not in result[0].text
+        assert "API error: Server error (500)" in result[0].text
+
+    @pytest.mark.asyncio
+    async def test_timeout_error_returns_sanitized_message(self):
+        """Test timeout error returns sanitized network error message."""
+        import httpx
+
+        mock_client = AsyncMock()
+        mock_client.get_company.side_effect = httpx.TimeoutException(
+            "Connection to https://api.secret.com/internal timed out"
+        )
+
+        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
+            result = await call_tool("highlight_get_company", {})
+
+        assert len(result) == 1
+        assert "secret.com" not in result[0].text
+        assert "Network error: Request timed out" in result[0].text
+
+    @pytest.mark.asyncio
+    async def test_connect_error_returns_sanitized_message(self):
+        """Test connection error returns sanitized network error message."""
+        import httpx
+
+        mock_client = AsyncMock()
+        mock_client.get_company.side_effect = httpx.ConnectError(
+            "Failed to connect to internal.api.server:8443"
+        )
+
+        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
+            result = await call_tool("highlight_get_company", {})
+
+        assert len(result) == 1
+        assert "internal.api.server" not in result[0].text
+        assert "8443" not in result[0].text
+        assert "Network error: Unable to connect to CAST Highlight API" in result[0].text
+
+
+class TestSanitizeErrorMessage:
+    """Tests for _sanitize_error_message function."""
+
+    def test_http_status_error_401(self):
+        """Test HTTP 401 returns authentication failed message."""
+        import httpx
+        from cast_highlight_mcp.server import _sanitize_error_message
+
+        error = httpx.HTTPStatusError(
+            "401 Unauthorized",
+            request=MagicMock(),
+            response=MagicMock(status_code=401),
+        )
+        result = _sanitize_error_message(error)
+        assert result == "API error: Authentication failed (401)"
+
+    def test_http_status_error_403(self):
+        """Test HTTP 403 returns access forbidden message."""
+        import httpx
+        from cast_highlight_mcp.server import _sanitize_error_message
+
+        error = httpx.HTTPStatusError(
+            "403 Forbidden",
+            request=MagicMock(),
+            response=MagicMock(status_code=403),
+        )
+        result = _sanitize_error_message(error)
+        assert result == "API error: Access forbidden (403)"
+
+    def test_http_status_error_404(self):
+        """Test HTTP 404 returns resource not found message."""
+        import httpx
+        from cast_highlight_mcp.server import _sanitize_error_message
+
+        error = httpx.HTTPStatusError(
+            "404 Not Found",
+            request=MagicMock(),
+            response=MagicMock(status_code=404),
+        )
+        result = _sanitize_error_message(error)
+        assert result == "API error: Resource not found (404)"
+
+    def test_http_status_error_429(self):
+        """Test HTTP 429 returns rate limit exceeded message."""
+        import httpx
+        from cast_highlight_mcp.server import _sanitize_error_message
+
+        error = httpx.HTTPStatusError(
+            "429 Too Many Requests",
+            request=MagicMock(),
+            response=MagicMock(status_code=429),
+        )
+        result = _sanitize_error_message(error)
+        assert result == "API error: Rate limit exceeded (429)"
+
+    def test_http_status_error_4xx_generic(self):
+        """Test generic 4xx returns client error message."""
+        import httpx
+        from cast_highlight_mcp.server import _sanitize_error_message
+
+        error = httpx.HTTPStatusError(
+            "400 Bad Request",
+            request=MagicMock(),
+            response=MagicMock(status_code=400),
+        )
+        result = _sanitize_error_message(error)
+        assert result == "API error: Client error (400)"
+
+    def test_http_status_error_5xx(self):
+        """Test 5xx returns server error message."""
+        import httpx
+        from cast_highlight_mcp.server import _sanitize_error_message
+
+        error = httpx.HTTPStatusError(
+            "502 Bad Gateway",
+            request=MagicMock(),
+            response=MagicMock(status_code=502),
+        )
+        result = _sanitize_error_message(error)
+        assert result == "API error: Server error (502)"
+
+    def test_timeout_exception(self):
+        """Test TimeoutException returns sanitized timeout message."""
+        import httpx
+        from cast_highlight_mcp.server import _sanitize_error_message
+
+        error = httpx.TimeoutException("Connection to api.server.com timed out")
+        result = _sanitize_error_message(error)
+        assert result == "Network error: Request timed out"
+        assert "api.server.com" not in result
+
+    def test_connect_error(self):
+        """Test ConnectError returns sanitized connection message."""
+        import httpx
+        from cast_highlight_mcp.server import _sanitize_error_message
+
+        error = httpx.ConnectError("Failed to connect to internal-server:8443")
+        result = _sanitize_error_message(error)
+        assert result == "Network error: Unable to connect to CAST Highlight API"
+        assert "internal-server" not in result
+
+    def test_request_error(self):
+        """Test generic RequestError returns sanitized network message."""
+        import httpx
+        from cast_highlight_mcp.server import _sanitize_error_message
+
+        error = httpx.RequestError("SSL certificate verification failed for private.api.com")
+        result = _sanitize_error_message(error)
+        assert result == "Network error: Failed to communicate with CAST Highlight API"
+        assert "private.api.com" not in result
+        assert "SSL" not in result
+
+    def test_value_error(self):
+        """Test ValueError returns sanitized validation message."""
+        from cast_highlight_mcp.server import _sanitize_error_message
+
+        error = ValueError("Invalid company_id: user_provided_value_123")
+        result = _sanitize_error_message(error)
+        assert result == "Validation error: Invalid argument value"
+        assert "user_provided_value_123" not in result
+
+    def test_key_error(self):
+        """Test KeyError returns message with key name."""
+        from cast_highlight_mcp.server import _sanitize_error_message
+
+        error = KeyError("application_id")
+        result = _sanitize_error_message(error)
+        assert result == "Missing required argument: application_id"
+
+    def test_runtime_error_not_initialized(self):
+        """Test RuntimeError for uninitialized client."""
+        from cast_highlight_mcp.server import _sanitize_error_message
+
+        error = RuntimeError("Client not initialized. Server must be started with run_server().")
+        result = _sanitize_error_message(error)
+        assert result == "Server error: Service not ready"
+
+    def test_runtime_error_generic(self):
+        """Test generic RuntimeError returns unexpected error."""
+        from cast_highlight_mcp.server import _sanitize_error_message
+
+        error = RuntimeError("Something went wrong with internal path /var/secret")
+        result = _sanitize_error_message(error)
+        assert result == "An unexpected error occurred"
+        assert "/var/secret" not in result
+
+    def test_generic_exception(self):
+        """Test unknown exception type returns generic message."""
+        from cast_highlight_mcp.server import _sanitize_error_message
+
+        error = Exception("Detailed internal error: database password is xyz123")
+        result = _sanitize_error_message(error)
+        assert result == "An unexpected error occurred"
+        assert "xyz123" not in result
+        assert "password" not in result

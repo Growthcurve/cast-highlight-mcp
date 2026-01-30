@@ -110,8 +110,8 @@ class TestToolCallLogging:
         with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
             result = await call_tool("highlight_get_company", {})
 
-        # Should return error message
-        assert "Error:" in result[0].text
+        # Should return sanitized error message (not raw exception)
+        assert "An unexpected error occurred" in result[0].text
 
         # Check for "Tool call failed" log
         log_messages = [record.getMessage() for record in capture_logs.records]
@@ -348,7 +348,7 @@ class TestObservabilityDoesNotBreakTools:
 
     @pytest.mark.asyncio
     async def test_tool_error_still_returns_error_message(self, reset_metrics):
-        """Test that tool errors still return proper error messages."""
+        """Test that tool errors still return sanitized error messages."""
         mock_client = AsyncMock()
         mock_client.get_company.side_effect = Exception("API connection failed")
 
@@ -356,7 +356,8 @@ class TestObservabilityDoesNotBreakTools:
             result = await call_tool("highlight_get_company", {})
 
         assert len(result) == 1
-        assert "Error: API connection failed" in result[0].text
+        # Error messages are now sanitized to prevent information leakage
+        assert "An unexpected error occurred" in result[0].text
 
     @pytest.mark.asyncio
     async def test_tool_works_even_with_logging_errors(self, reset_metrics):

@@ -208,6 +208,57 @@ def _classify_error(exception: Exception) -> str:
     return "unknown"
 
 
+def _sanitize_error_message(exception: Exception) -> str:
+    """Create a sanitized error message safe for client exposure.
+
+    Prevents information leakage by returning generic messages
+    that don't expose sensitive details like URLs, headers, or
+    internal system information.
+
+    Args:
+        exception: The exception to sanitize
+
+    Returns:
+        A sanitized error message safe for client exposure
+    """
+    if isinstance(exception, httpx.HTTPStatusError):
+        status = exception.response.status_code
+        # Only expose status code, not the full response or URL
+        if status == 401:
+            return "API error: Authentication failed (401)"
+        elif status == 403:
+            return "API error: Access forbidden (403)"
+        elif status == 404:
+            return "API error: Resource not found (404)"
+        elif status == 429:
+            return "API error: Rate limit exceeded (429)"
+        elif 400 <= status < 500:
+            return f"API error: Client error ({status})"
+        elif 500 <= status < 600:
+            return f"API error: Server error ({status})"
+        return f"API error: HTTP {status}"
+    elif isinstance(exception, httpx.TimeoutException):
+        return "Network error: Request timed out"
+    elif isinstance(exception, httpx.ConnectError):
+        return "Network error: Unable to connect to CAST Highlight API"
+    elif isinstance(exception, httpx.RequestError):
+        return "Network error: Failed to communicate with CAST Highlight API"
+    elif isinstance(exception, ValueError):
+        # ValueError may contain user input, so sanitize it
+        return "Validation error: Invalid argument value"
+    elif isinstance(exception, KeyError):
+        # KeyError contains the missing key name which is safe to expose
+        key = str(exception).strip("'\"")
+        return f"Missing required argument: {key}"
+    elif isinstance(exception, RuntimeError):
+        # RuntimeError from get_client() is safe - it's our own message
+        if "not initialized" in str(exception).lower():
+            return "Server error: Service not ready"
+        return "An unexpected error occurred"
+    # Generic fallback - never expose raw exception messages
+    return "An unexpected error occurred"
+
+
 @server.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     api = get_client()
@@ -311,7 +362,9 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 error_type=error_type,
             )
 
-            return [TextContent(type="text", text=f"Error: {str(e)}")]
+            # Return sanitized error message to prevent information leakage
+            sanitized_message = _sanitize_error_message(e)
+            return [TextContent(type="text", text=sanitized_message)]
 
 
 def main():
