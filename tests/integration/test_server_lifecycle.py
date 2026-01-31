@@ -13,7 +13,11 @@ This module uses two complementary testing approaches:
    - HighlightClient is initialized via AsyncExitStack
    - stdio_server() context manager is entered
    - server.run() is called with correct arguments
-   - Resources are cleaned up on both normal exit and exceptions
+
+   Cleanup verification:
+   - Tests assert that HighlightClient.__aexit__ is called on normal exit
+   - Tests assert that HighlightClient.__aexit__ is called on exception
+   - Tests use a custom TrackingHighlightClient that records lifecycle events
 
    These tests mock stdio_server and server.run() because:
    - stdio_server() requires actual stdio streams
@@ -26,12 +30,17 @@ This module uses two complementary testing approaches:
    - Testing cleanup on normal exit and exceptions
    - Verifying lazy initialization, idempotent close, and context manager reuse
 
-   This approach is necessary for pytest-asyncio tests because main() uses
-   asyncio.run() which cannot be nested.
+   This approach complements production path tests by providing fine-grained
+   verification of each component's behavior. The patterns tested here match
+   exactly what main() does internally.
+
+   Note: These tests use pytest-asyncio's async test functions. They cannot call
+   main() directly because main() uses asyncio.run() which cannot be nested
+   inside an already-running event loop.
 
 Both approaches together provide comprehensive coverage: production path tests
-ensure the startup sequence is correct, while isolated tests verify each
-component's lifecycle behavior in detail.
+ensure the startup sequence is correct and cleanup occurs, while isolated tests
+verify each component's lifecycle behavior in detail.
 
 For true end-to-end testing with an actual MCP client, see the manual testing
 instructions in docs/DEVELOPER.md or use `make run`.
@@ -409,10 +418,13 @@ class TestServerMainFunction:
     These tests verify that the production main() function correctly:
     1. Initializes the HighlightClient before running the server
     2. Makes the client available via get_client() during operation
-    3. Cleans up resources when the server exits
+    3. Cleans up resources when the server exits (both normal and exception cases)
 
-    We call main() through asyncio.run(), so we patch asyncio.run to
-    execute our test assertions during the server's operation phase.
+    Implementation notes:
+    - Tests call server.main() directly to exercise the actual production code path
+    - We use a TrackingHighlightClient that patches HighlightClient to record lifecycle events
+    - This allows us to verify that __aenter__ and __aexit__ are actually called
+    - stdio_server and server.run() are mocked because they require real I/O
     """
 
     def test_main_calls_production_startup_sequence(self, mock_config):
@@ -424,11 +436,14 @@ class TestServerMainFunction:
         3. HighlightClient is initialized via AsyncExitStack
         4. stdio_server() context manager is entered
         5. server.run() is called with the correct arguments
+        6. HighlightClient.__aexit__ is called on normal exit (cleanup assertion)
         """
         client_was_set = False
         client_type_correct = False
         server_run_called = False
         server_run_args = None
+        client_aexit_called = False
+        client_aenter_called = False
 
         async def mock_server_run(*args, **kwargs):
             nonlocal client_was_set, client_type_correct, server_run_called, server_run_args
@@ -438,7 +453,20 @@ class TestServerMainFunction:
             client_was_set = server._client is not None
             client_type_correct = isinstance(server._client, HighlightClient)
 
+        # Create a tracking wrapper to verify lifecycle methods are called
+        class TrackingHighlightClient(HighlightClient):
+            async def __aenter__(self):
+                nonlocal client_aenter_called
+                client_aenter_called = True
+                return await super().__aenter__()
+
+            async def __aexit__(self, *args):
+                nonlocal client_aexit_called
+                client_aexit_called = True
+                return await super().__aexit__(*args)
+
         original_client = server._client
+        original_config = server._config
 
         try:
             with (
@@ -449,6 +477,10 @@ class TestServerMainFunction:
                 patch.object(server.server, "run", mock_server_run),
                 patch.object(server.server, "create_initialization_options", return_value={}),
                 patch("cast_highlight_mcp.server.configure_logging") as mock_logging,
+                patch(
+                    "cast_highlight_mcp.server.HighlightClient",
+                    TrackingHighlightClient,
+                ),
             ):
                 # Setup mock stdio_server as async context manager
                 mock_stdio.return_value.__aenter__ = AsyncMock(
@@ -472,23 +504,47 @@ class TestServerMainFunction:
                 assert client_was_set, "Client should be set during server operation"
                 assert client_type_correct, "Client should be HighlightClient instance"
 
+                # Verify lifecycle methods were called (cleanup assertions)
+                assert client_aenter_called, (
+                    "HighlightClient.__aenter__ should be called during startup"
+                )
+                assert client_aexit_called, (
+                    "HighlightClient.__aexit__ should be called on normal exit (cleanup)"
+                )
+
         finally:
             server._client = original_client
+            server._config = original_config
 
     def test_main_cleans_up_on_server_run_exception(self, mock_config):
         """Test that main() cleans up resources when server.run() raises an exception.
 
-        This exercises the production exception handling path in main().
+        This exercises the production exception handling path in main() and verifies
+        that HighlightClient.__aexit__ is called even when server.run() fails.
         """
         original_client = server._client
-        cleanup_detected = False
+        original_config = server._config
+        client_aexit_called = False
+        client_aenter_called = False
 
-        # We need to detect cleanup indirectly since HighlightClient is created
-        # inside main(). We do this by checking _client is None after main() exits.
         async def mock_server_run_with_error(*args, **kwargs):
             # Verify client was set before the error
             assert server._client is not None, "Client should be set before error"
             raise RuntimeError("Simulated server error")
+
+        # Create a tracking wrapper to verify cleanup happens on exception
+        class TrackingHighlightClient(HighlightClient):
+            async def __aenter__(self):
+                nonlocal client_aenter_called
+                client_aenter_called = True
+                return await super().__aenter__()
+
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                nonlocal client_aexit_called
+                client_aexit_called = True
+                # Verify we're being called with exception info
+                assert exc_type is RuntimeError, "__aexit__ should receive the exception type"
+                return await super().__aexit__(exc_type, exc_val, exc_tb)
 
         try:
             with (
@@ -497,6 +553,10 @@ class TestServerMainFunction:
                 patch.object(server.server, "run", mock_server_run_with_error),
                 patch.object(server.server, "create_initialization_options", return_value={}),
                 patch("cast_highlight_mcp.server.configure_logging"),
+                patch(
+                    "cast_highlight_mcp.server.HighlightClient",
+                    TrackingHighlightClient,
+                ),
             ):
                 mock_stdio.return_value.__aenter__ = AsyncMock(
                     return_value=(AsyncMock(), AsyncMock())
@@ -507,14 +567,58 @@ class TestServerMainFunction:
                 with pytest.raises(RuntimeError, match="Simulated server error"):
                     server.main()
 
-                # After main() exits (even with exception), cleanup should have happened
-                # The AsyncExitStack ensures __aexit__ is called on HighlightClient
-                cleanup_detected = True
-
-            assert cleanup_detected, "Exception should propagate and cleanup should occur"
+                # Verify lifecycle methods were called even with exception
+                assert client_aenter_called, (
+                    "HighlightClient.__aenter__ should be called during startup"
+                )
+                assert client_aexit_called, (
+                    "HighlightClient.__aexit__ should be called on exception (cleanup)"
+                )
 
         finally:
             server._client = original_client
+            server._config = original_config
+
+    def test_main_cleans_up_stdio_server_on_exit(self, mock_config):
+        """Test that main() cleans up the stdio_server context manager on exit.
+
+        This test focuses specifically on stdio_server cleanup. For HighlightClient
+        cleanup verification, see test_main_calls_production_startup_sequence and
+        test_main_cleans_up_on_server_run_exception.
+        """
+        original_client = server._client
+        original_config = server._config
+        stdio_aexit_called = False
+
+        async def mock_server_run(*args, **kwargs):
+            pass  # Normal exit
+
+        async def track_stdio_aexit(*args):
+            nonlocal stdio_aexit_called
+            stdio_aexit_called = True
+            return None
+
+        try:
+            with (
+                patch("cast_highlight_mcp.server.load_config", return_value=mock_config),
+                patch("cast_highlight_mcp.server.stdio_server") as mock_stdio,
+                patch.object(server.server, "run", mock_server_run),
+                patch.object(server.server, "create_initialization_options", return_value={}),
+                patch("cast_highlight_mcp.server.configure_logging"),
+            ):
+                mock_stdio.return_value.__aenter__ = AsyncMock(
+                    return_value=(AsyncMock(), AsyncMock())
+                )
+                mock_stdio.return_value.__aexit__ = AsyncMock(side_effect=track_stdio_aexit)
+
+                server.main()
+
+                # Verify stdio_server cleanup was called
+                assert stdio_aexit_called, "stdio_server.__aexit__ should be called on normal exit"
+
+        finally:
+            server._client = original_client
+            server._config = original_config
 
     @pytest.mark.asyncio
     async def test_async_lifecycle_pattern_matches_production(self, mock_config):
