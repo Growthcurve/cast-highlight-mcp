@@ -23,15 +23,33 @@ class ValidationError(Exception):
 
 
 @dataclass
-class ValidatedArgs:
-    """Container for validated tool arguments.
+class ValidatedCompanyArgs:
+    """Container for validated company-related arguments.
 
-    Provides type-safe access to validated argument values.
+    Used by tools that only need an optional company_id.
     """
 
     company_id: int | None = None
-    domain_id: int | None = None
-    application_id: int | None = None
+
+
+@dataclass
+class ValidatedDomainArgs:
+    """Container for validated domain-related arguments.
+
+    Used by tools that require a domain_id.
+    """
+
+    domain_id: int
+
+
+@dataclass
+class ValidatedApplicationArgs:
+    """Container for validated application-related arguments.
+
+    Used by tools that require an application_id.
+    """
+
+    application_id: int
 
 
 def validate_positive_integer(value: Any, field_name: str, required: bool = False) -> int | None:
@@ -126,67 +144,71 @@ def validate_application_id(arguments: dict, required: bool = True) -> int | Non
     return validate_positive_integer(arguments.get("application_id"), "application_id", required)
 
 
-def validate_get_company_args(arguments: dict) -> ValidatedArgs:
+def validate_get_company_args(arguments: dict) -> ValidatedCompanyArgs:
     """Validate arguments for highlight_get_company tool.
 
     Args:
         arguments: The tool arguments dictionary
 
     Returns:
-        ValidatedArgs with validated company_id
+        ValidatedCompanyArgs with validated company_id
 
     Raises:
         ValidationError: If validation fails
     """
-    return ValidatedArgs(company_id=validate_company_id(arguments, required=False))
+    return ValidatedCompanyArgs(company_id=validate_company_id(arguments, required=False))
 
 
-def validate_list_domains_args(arguments: dict) -> ValidatedArgs:
+def validate_list_domains_args(arguments: dict) -> ValidatedCompanyArgs:
     """Validate arguments for highlight_list_domains tool.
 
     Args:
         arguments: The tool arguments dictionary
 
     Returns:
-        ValidatedArgs with validated company_id
+        ValidatedCompanyArgs with validated company_id
 
     Raises:
         ValidationError: If validation fails
     """
-    return ValidatedArgs(company_id=validate_company_id(arguments, required=False))
+    return ValidatedCompanyArgs(company_id=validate_company_id(arguments, required=False))
 
 
-def validate_get_domain_args(arguments: dict) -> ValidatedArgs:
+def validate_get_domain_args(arguments: dict) -> ValidatedDomainArgs:
     """Validate arguments for highlight_get_domain tool.
 
     Args:
         arguments: The tool arguments dictionary
 
     Returns:
-        ValidatedArgs with validated domain_id
+        ValidatedDomainArgs with validated domain_id
 
     Raises:
         ValidationError: If validation fails
     """
-    return ValidatedArgs(domain_id=validate_domain_id(arguments, required=True))
+    domain_id = validate_domain_id(arguments, required=True)
+    assert domain_id is not None  # Required validation ensures this
+    return ValidatedDomainArgs(domain_id=domain_id)
 
 
-def validate_list_applications_args(arguments: dict) -> ValidatedArgs:
+def validate_list_applications_args(arguments: dict) -> ValidatedDomainArgs:
     """Validate arguments for highlight_list_applications tool.
 
     Args:
         arguments: The tool arguments dictionary
 
     Returns:
-        ValidatedArgs with validated domain_id
+        ValidatedDomainArgs with validated domain_id
 
     Raises:
         ValidationError: If validation fails
     """
-    return ValidatedArgs(domain_id=validate_domain_id(arguments, required=True))
+    domain_id = validate_domain_id(arguments, required=True)
+    assert domain_id is not None  # Required validation ensures this
+    return ValidatedDomainArgs(domain_id=domain_id)
 
 
-def validate_application_args(arguments: dict) -> ValidatedArgs:
+def validate_application_args(arguments: dict) -> ValidatedApplicationArgs:
     """Validate arguments for application-related tools.
 
     This is used by highlight_get_application, highlight_get_metrics,
@@ -198,9 +220,11 @@ def validate_application_args(arguments: dict) -> ValidatedArgs:
         arguments: The tool arguments dictionary
 
     Returns:
-        ValidatedArgs with validated application_id
+        ValidatedApplicationArgs with validated application_id
 
     Raises:
         ValidationError: If validation fails
     """
-    return ValidatedArgs(application_id=validate_application_id(arguments, required=True))
+    application_id = validate_application_id(arguments, required=True)
+    assert application_id is not None  # Required validation ensures this
+    return ValidatedApplicationArgs(application_id=application_id)

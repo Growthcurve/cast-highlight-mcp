@@ -3,7 +3,9 @@
 import pytest
 
 from cast_highlight_mcp.validation import (
-    ValidatedArgs,
+    ValidatedApplicationArgs,
+    ValidatedCompanyArgs,
+    ValidatedDomainArgs,
     ValidationError,
     validate_application_args,
     validate_application_id,
@@ -201,9 +203,9 @@ class TestValidateGetCompanyArgs:
     """Tests for validate_get_company_args function."""
 
     def test_empty_args_returns_none_company_id(self):
-        """Test empty arguments returns ValidatedArgs with None company_id."""
+        """Test empty arguments returns ValidatedCompanyArgs with None company_id."""
         result = validate_get_company_args({})
-        assert isinstance(result, ValidatedArgs)
+        assert isinstance(result, ValidatedCompanyArgs)
         assert result.company_id is None
 
     def test_valid_company_id(self):
@@ -221,9 +223,9 @@ class TestValidateListDomainsArgs:
     """Tests for validate_list_domains_args function."""
 
     def test_empty_args_returns_none_company_id(self):
-        """Test empty arguments returns ValidatedArgs with None company_id."""
+        """Test empty arguments returns ValidatedCompanyArgs with None company_id."""
         result = validate_list_domains_args({})
-        assert isinstance(result, ValidatedArgs)
+        assert isinstance(result, ValidatedCompanyArgs)
         assert result.company_id is None
 
     def test_valid_company_id(self):
@@ -238,7 +240,7 @@ class TestValidateGetDomainArgs:
     def test_valid_domain_id(self):
         """Test valid domain_id is captured."""
         result = validate_get_domain_args({"domain_id": 123})
-        assert isinstance(result, ValidatedArgs)
+        assert isinstance(result, ValidatedDomainArgs)
         assert result.domain_id == 123
 
     def test_missing_domain_id_raises(self):
@@ -259,7 +261,7 @@ class TestValidateListApplicationsArgs:
     def test_valid_domain_id(self):
         """Test valid domain_id is captured."""
         result = validate_list_applications_args({"domain_id": 456})
-        assert isinstance(result, ValidatedArgs)
+        assert isinstance(result, ValidatedDomainArgs)
         assert result.domain_id == 456
 
     def test_missing_domain_id_raises(self):
@@ -275,7 +277,7 @@ class TestValidateApplicationArgs:
     def test_valid_application_id(self):
         """Test valid application_id is captured."""
         result = validate_application_args({"application_id": 789})
-        assert isinstance(result, ValidatedArgs)
+        assert isinstance(result, ValidatedApplicationArgs)
         assert result.application_id == 789
 
     def test_missing_application_id_raises(self):
@@ -290,26 +292,33 @@ class TestValidateApplicationArgs:
             validate_application_args({"application_id": -100})
 
 
-class TestValidatedArgs:
-    """Tests for ValidatedArgs dataclass."""
+class TestValidatedCompanyArgs:
+    """Tests for ValidatedCompanyArgs dataclass."""
 
     def test_default_values(self):
-        """Test default values are None."""
-        args = ValidatedArgs()
+        """Test default value is None."""
+        args = ValidatedCompanyArgs()
         assert args.company_id is None
-        assert args.domain_id is None
-        assert args.application_id is None
 
-    def test_explicit_values(self):
-        """Test explicit values are captured."""
-        args = ValidatedArgs(company_id=1, domain_id=2, application_id=3)
-        assert args.company_id == 1
-        assert args.domain_id == 2
-        assert args.application_id == 3
+    def test_explicit_value(self):
+        """Test explicit value is captured."""
+        args = ValidatedCompanyArgs(company_id=1234)
+        assert args.company_id == 1234
 
-    def test_partial_values(self):
-        """Test partial values work correctly."""
-        args = ValidatedArgs(domain_id=100)
-        assert args.company_id is None
-        assert args.domain_id == 100
-        assert args.application_id is None
+
+class TestValidatedDomainArgs:
+    """Tests for ValidatedDomainArgs dataclass."""
+
+    def test_explicit_value(self):
+        """Test explicit value is captured."""
+        args = ValidatedDomainArgs(domain_id=5678)
+        assert args.domain_id == 5678
+
+
+class TestValidatedApplicationArgs:
+    """Tests for ValidatedApplicationArgs dataclass."""
+
+    def test_explicit_value(self):
+        """Test explicit value is captured."""
+        args = ValidatedApplicationArgs(application_id=9012)
+        assert args.application_id == 9012
