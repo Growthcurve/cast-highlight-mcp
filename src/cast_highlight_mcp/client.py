@@ -6,11 +6,44 @@ import time
 from typing import Any
 
 import httpx
+from tenacity import (
+    AsyncRetrying,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from .config import Config
 from .observability import get_current_context, get_logger, get_metrics_collector
 
 logger = get_logger(__name__)
+
+
+def _is_retryable_exception(exc: BaseException) -> bool:
+    """Determine if an exception should trigger a retry.
+
+    Retryable conditions:
+    - Connection errors (network issues)
+    - Timeout errors
+    - 5xx server errors (except 501 Not Implemented)
+    - 429 Too Many Requests (rate limiting)
+
+    Non-retryable conditions:
+    - 4xx client errors (except 429)
+    - 501 Not Implemented (server doesn't support the request)
+    """
+    if isinstance(exc, (httpx.ConnectError, httpx.TimeoutException)):
+        return True
+
+    if isinstance(exc, httpx.HTTPStatusError):
+        status_code: int = exc.response.status_code
+        # Retry on 429 (rate limit) and 5xx (except 501)
+        if status_code == 429:
+            return True
+        if 500 <= status_code < 600 and status_code != 501:
+            return True
+
+    return False
 
 
 class HighlightClient:
@@ -54,9 +87,16 @@ class HighlightClient:
                 self._client = None
 
     async def _request(self, method: str, path: str, **kwargs) -> Any:
-        """Make an HTTP request to the CAST Highlight API.
+        """Make an HTTP request to the CAST Highlight API with retry logic.
 
-        Includes structured logging and metrics collection for observability.
+        Includes structured logging, metrics collection, and automatic retries
+        with exponential backoff for transient failures.
+
+        Retry behavior:
+        - Retries on: connection errors, timeouts, 429 (rate limit), 5xx errors
+        - Does NOT retry on: 4xx client errors (except 429), 501 Not Implemented
+        - Uses exponential backoff between retries
+
         Observability operations use graceful degradation - they will not cause
         request failures if they encounter errors.
 
@@ -69,8 +109,10 @@ class HighlightClient:
             Parsed JSON response
 
         Raises:
-            httpx.HTTPStatusError: For 4xx/5xx responses
-            httpx.RequestError: For connection/timeout errors
+            httpx.HTTPStatusError: For non-retryable 4xx/5xx responses or after
+                all retries exhausted
+            httpx.RequestError: For connection/timeout errors after all retries
+                exhausted
         """
         # Get current context for request correlation (with graceful degradation)
         try:
@@ -95,8 +137,13 @@ class HighlightClient:
             pass  # Logging should never break the request
 
         start_time = time.perf_counter()
+        attempt_number = 0
 
-        try:
+        async def _make_request() -> Any:
+            """Inner function that makes the actual request."""
+            nonlocal attempt_number
+            attempt_number += 1
+
             client = await self._get_client()
             url = f"{self.base_url}{path}"
             response = await client.request(method, url, **kwargs)
@@ -115,18 +162,19 @@ class HighlightClient:
 
             # Log completion - graceful degradation
             try:
+                extra_context: dict[str, Any] = {
+                    "method": method,
+                    "path": path,
+                    "status_code": status_code,
+                    "duration_ms": round(duration_ms, 2),
+                    "request_id": request_id,
+                }
+                if attempt_number > 1:
+                    extra_context["attempt"] = attempt_number
                 logger.log(
                     log_level,
                     "HTTP request completed",
-                    extra={
-                        "context": {
-                            "method": method,
-                            "path": path,
-                            "status_code": status_code,
-                            "duration_ms": round(duration_ms, 2),
-                            "request_id": request_id,
-                        }
-                    },
+                    extra={"context": extra_context},
                 )
             except Exception:
                 pass
@@ -141,11 +189,27 @@ class HighlightClient:
             response.raise_for_status()
             return response.json()
 
+        # Configure retry behavior
+        retry_config = AsyncRetrying(
+            stop=stop_after_attempt(self.config.retry_attempts),
+            wait=wait_exponential(
+                multiplier=self.config.retry_multiplier,
+                min=self.config.retry_min_wait,
+                max=self.config.retry_max_wait,
+            ),
+            retry=retry_if_exception(_is_retryable_exception),
+            reraise=True,
+        )
+
+        try:
+            async for attempt in retry_config:
+                with attempt:
+                    return await _make_request()
         except httpx.TimeoutException:
             duration_ms = (time.perf_counter() - start_time) * 1000
             try:
                 logger.warning(
-                    "HTTP request timeout",
+                    "HTTP request timeout after retries",
                     extra={
                         "context": {
                             "method": method,
@@ -153,6 +217,7 @@ class HighlightClient:
                             "duration_ms": round(duration_ms, 2),
                             "error_type": "timeout",
                             "request_id": request_id,
+                            "attempts": attempt_number,
                         }
                     },
                 )
@@ -160,15 +225,33 @@ class HighlightClient:
                 pass
             raise
 
-        except httpx.HTTPStatusError:
-            # Already logged above with status code, just re-raise
+        except httpx.HTTPStatusError as e:
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            # Log if this was a retryable error that exhausted retries
+            if _is_retryable_exception(e) and attempt_number > 1:
+                try:
+                    logger.error(
+                        "HTTP request failed after retries",
+                        extra={
+                            "context": {
+                                "method": method,
+                                "path": path,
+                                "status_code": e.response.status_code,
+                                "duration_ms": round(duration_ms, 2),
+                                "request_id": request_id,
+                                "attempts": attempt_number,
+                            }
+                        },
+                    )
+                except Exception:
+                    pass
             raise
 
         except httpx.RequestError as e:
             duration_ms = (time.perf_counter() - start_time) * 1000
             try:
                 logger.error(
-                    "HTTP request failed",
+                    "HTTP request failed after retries",
                     extra={
                         "context": {
                             "method": method,
@@ -177,12 +260,16 @@ class HighlightClient:
                             "error_type": type(e).__name__,
                             "error_message": str(e),
                             "request_id": request_id,
+                            "attempts": attempt_number,
                         }
                     },
                 )
             except Exception:
                 pass
             raise
+
+        # This should not be reachable, but satisfies type checker
+        raise RuntimeError("Unexpected retry loop exit")
 
     async def get(self, path: str, **kwargs) -> Any:
         return await self._request("GET", path, **kwargs)

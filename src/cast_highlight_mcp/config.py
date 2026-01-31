@@ -17,6 +17,10 @@ class Config:
     access_token: str
     company_id: int
     timeout: int = 30
+    retry_attempts: int = 3
+    retry_min_wait: float = 1.0
+    retry_max_wait: float = 10.0
+    retry_multiplier: float = 2.0
 
 
 @dataclass
@@ -168,13 +172,30 @@ def load_observability_config() -> ObservabilityConfig:
 
 
 def load_config() -> Config:
-    """Load configuration from environment variables."""
+    """Load configuration from environment variables.
+
+    Environment Variables:
+        HIGHLIGHT_BASE_URL: Base URL for the CAST Highlight API (required)
+        HIGHLIGHT_ACCESS_TOKEN: Bearer token for authentication (required)
+        HIGHLIGHT_COMPANY_ID: Default company ID (required)
+        HIGHLIGHT_TIMEOUT: Request timeout in seconds (default: 30)
+        HIGHLIGHT_RETRY_ATTEMPTS: Maximum retry attempts (default: 3)
+        HIGHLIGHT_RETRY_MIN_WAIT: Minimum wait between retries in seconds (default: 1.0)
+        HIGHLIGHT_RETRY_MAX_WAIT: Maximum wait between retries in seconds (default: 10.0)
+        HIGHLIGHT_RETRY_MULTIPLIER: Exponential backoff multiplier (default: 2.0)
+    """
     load_dotenv()
 
     base_url = os.getenv("HIGHLIGHT_BASE_URL")
     access_token = os.getenv("HIGHLIGHT_ACCESS_TOKEN")
     company_id = os.getenv("HIGHLIGHT_COMPANY_ID")
     timeout = int(os.getenv("HIGHLIGHT_TIMEOUT", "30"))
+
+    # Retry configuration
+    retry_attempts = int(os.getenv("HIGHLIGHT_RETRY_ATTEMPTS", "3"))
+    retry_min_wait = float(os.getenv("HIGHLIGHT_RETRY_MIN_WAIT", "1.0"))
+    retry_max_wait = float(os.getenv("HIGHLIGHT_RETRY_MAX_WAIT", "10.0"))
+    retry_multiplier = float(os.getenv("HIGHLIGHT_RETRY_MULTIPLIER", "2.0"))
 
     if not base_url:
         raise ValueError("HIGHLIGHT_BASE_URL environment variable is required")
@@ -188,4 +209,8 @@ def load_config() -> Config:
         access_token=access_token,
         company_id=int(company_id),
         timeout=timeout,
+        retry_attempts=retry_attempts,
+        retry_min_wait=retry_min_wait,
+        retry_max_wait=retry_max_wait,
+        retry_multiplier=retry_multiplier,
     )
