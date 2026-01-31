@@ -218,7 +218,8 @@ class HighlightClient:
             the expected domain count if authentication or network errors occur.
 
         Raises:
-            ValueError: If delay is negative or max_consecutive_misses is < 1.
+            ValueError: If delay is negative, max_consecutive_misses < 1, or
+                max_iterations < 1 (when provided).
 
         Note:
             This method scans domain IDs starting from the company ID since
@@ -230,11 +231,14 @@ class HighlightClient:
             raise ValueError("delay must be non-negative")
         if max_consecutive_misses < 1:
             raise ValueError("max_consecutive_misses must be at least 1")
+        if max_iterations is not None and max_iterations < 1:
+            raise ValueError("max_iterations must be at least 1")
 
         cid = company_id or self.config.company_id
         # Get company info to know domain count
         company = await self.get(f"/companies/{cid}")
-        domain_count = company.get("domains", 0)
+        # Handle None from API (e.g., "domains": null) by coercing to 0
+        domain_count = company.get("domains") or 0
 
         # Calculate iteration limit to prevent unbounded scanning
         iteration_limit = (

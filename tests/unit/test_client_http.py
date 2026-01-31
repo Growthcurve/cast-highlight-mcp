@@ -749,6 +749,38 @@ class TestListDomainsMaxIterations:
         # Should stop at iteration limit, not scan 1000+ IDs
         assert call_count == 50
 
+    @pytest.mark.asyncio
+    async def test_list_domains_rejects_zero_max_iterations(self, client):
+        """Test list_domains raises ValueError when max_iterations is 0."""
+        with pytest.raises(ValueError, match="max_iterations must be at least 1"):
+            await client.list_domains(max_iterations=0)
+
+    @pytest.mark.asyncio
+    async def test_list_domains_rejects_negative_max_iterations(self, client):
+        """Test list_domains raises ValueError when max_iterations is negative."""
+        with pytest.raises(ValueError, match="max_iterations must be at least 1"):
+            await client.list_domains(max_iterations=-5)
+
+    @pytest.mark.asyncio
+    async def test_list_domains_handles_null_domain_count(self, client):
+        """Test list_domains handles domains: null from API (coerces to 0)."""
+        mock_http_client = AsyncMock()
+
+        # API returns null for domains
+        company_response = MagicMock()
+        company_response.status_code = 200
+        company_response.json.return_value = {"id": 1234, "domains": None}
+        company_response.raise_for_status = MagicMock()
+        mock_http_client.request.return_value = company_response
+        mock_http_client.get = AsyncMock()
+        client._client = mock_http_client
+
+        result = await client.list_domains()
+
+        # Should return empty list without error (domains=None coerced to 0)
+        assert result == []
+        mock_http_client.get.assert_not_called()
+
 
 class TestListDomainsEdgeCases:
     """Edge case tests for list_domains."""
