@@ -6,6 +6,7 @@ import math
 import os
 import sys
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
@@ -231,8 +232,12 @@ def load_config() -> Config:
     if not base_url:
         raise ValueError("HIGHLIGHT_BASE_URL environment variable is required")
     # Security: Require HTTPS to protect bearer token in transit
-    if not base_url.startswith("https://"):
+    # Use proper URL parsing to handle edge cases (case-insensitive scheme, empty host)
+    parsed_url = urlparse(base_url)
+    if parsed_url.scheme.lower() != "https":
         raise ValueError("HIGHLIGHT_BASE_URL must use HTTPS for secure token transmission")
+    if not parsed_url.netloc:
+        raise ValueError("HIGHLIGHT_BASE_URL must include a valid host")
     if not access_token:
         raise ValueError("HIGHLIGHT_ACCESS_TOKEN environment variable is required")
     if not company_id:
