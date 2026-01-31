@@ -529,3 +529,363 @@ class TestGetClientThreadSafety:
         await client._get_client()
         await client.close()
         assert client._client is None
+
+
+class TestListDomainsConsecutiveMisses:
+    """Tests for max_consecutive_misses parameter."""
+
+    @pytest.mark.asyncio
+    async def test_list_domains_rejects_zero_max_consecutive_misses(self, client):
+        """Test list_domains raises ValueError when max_consecutive_misses < 1."""
+        with pytest.raises(ValueError, match="max_consecutive_misses must be at least 1"):
+            await client.list_domains(max_consecutive_misses=0)
+
+    @pytest.mark.asyncio
+    async def test_list_domains_rejects_negative_max_consecutive_misses(self, client):
+        """Test list_domains raises ValueError when max_consecutive_misses is negative."""
+        with pytest.raises(ValueError, match="max_consecutive_misses must be at least 1"):
+            await client.list_domains(max_consecutive_misses=-1)
+
+    @pytest.mark.asyncio
+    async def test_list_domains_stops_after_consecutive_misses(self, client):
+        """Test list_domains stops scanning after max_consecutive_misses reached."""
+        mock_http_client = AsyncMock()
+
+        # Setup company response
+        company_response = MagicMock()
+        company_response.status_code = 200
+        company_response.json.return_value = {"id": 1234, "domains": 10}
+        company_response.raise_for_status = MagicMock()
+        mock_http_client.request.return_value = company_response
+
+        # Track get calls - all return 404
+        call_count = 0
+
+        def mock_get(url):
+            nonlocal call_count
+            call_count += 1
+            return MagicMock(status_code=404)
+
+        mock_http_client.get = AsyncMock(side_effect=mock_get)
+        client._client = mock_http_client
+
+        result = await client.list_domains(max_consecutive_misses=3)
+
+        assert result == []
+        assert call_count == 3  # Should stop after 3 consecutive misses
+
+    @pytest.mark.asyncio
+    async def test_list_domains_resets_consecutive_misses_on_success(self, client):
+        """Test consecutive_misses counter resets to 0 after successful response."""
+        mock_http_client = AsyncMock()
+
+        # Setup company response - expects 2 domains
+        company_response = MagicMock()
+        company_response.status_code = 200
+        company_response.json.return_value = {"id": 1234, "domains": 2}
+        company_response.raise_for_status = MagicMock()
+        mock_http_client.request.return_value = company_response
+
+        call_count = 0
+
+        def mock_get(url):
+            nonlocal call_count
+            call_count += 1
+            # Pattern: 404, 404, 200 (domain 1), 404, 404, 200 (domain 2)
+            # If consecutive_misses resets on success, we should find both
+            if call_count == 3:
+                return MagicMock(
+                    status_code=200,
+                    json=MagicMock(return_value={"id": 1236, "name": "Domain1"}),
+                )
+            elif call_count == 6:
+                return MagicMock(
+                    status_code=200,
+                    json=MagicMock(return_value={"id": 1239, "name": "Domain2"}),
+                )
+            return MagicMock(status_code=404)
+
+        mock_http_client.get = AsyncMock(side_effect=mock_get)
+        client._client = mock_http_client
+
+        result = await client.list_domains(max_consecutive_misses=3)
+
+        assert len(result) == 2
+        assert call_count == 6  # Found both without early termination
+
+    @pytest.mark.asyncio
+    async def test_list_domains_accepts_custom_max_consecutive_misses(self, client):
+        """Test list_domains accepts custom max_consecutive_misses value."""
+        mock_http_client = AsyncMock()
+
+        company_response = MagicMock()
+        company_response.status_code = 200
+        company_response.json.return_value = {"id": 1234, "domains": 5}
+        company_response.raise_for_status = MagicMock()
+        mock_http_client.request.return_value = company_response
+
+        call_count = 0
+
+        def mock_get(url):
+            nonlocal call_count
+            call_count += 1
+            return MagicMock(status_code=404)
+
+        mock_http_client.get = AsyncMock(side_effect=mock_get)
+        client._client = mock_http_client
+
+        await client.list_domains(max_consecutive_misses=7)
+
+        assert call_count == 7  # Should have made exactly 7 requests
+
+
+class TestListDomainsMaxIterations:
+    """Tests for max_iterations parameter (safety limit)."""
+
+    @pytest.mark.asyncio
+    async def test_list_domains_uses_default_iteration_limit(self, client):
+        """Test list_domains uses max(domain_count * 3, 20) as default limit."""
+        mock_http_client = AsyncMock()
+
+        # Company with 5 domains -> limit = max(15, 20) = 20
+        company_response = MagicMock()
+        company_response.status_code = 200
+        company_response.json.return_value = {"id": 1234, "domains": 5}
+        company_response.raise_for_status = MagicMock()
+        mock_http_client.request.return_value = company_response
+
+        call_count = 0
+
+        def mock_get(url):
+            nonlocal call_count
+            call_count += 1
+            # Return success to prevent consecutive_misses from stopping early
+            # but never find all 5 domains
+            if call_count % 4 == 0:  # Only find 1 domain every 4 requests
+                return MagicMock(
+                    status_code=200,
+                    json=MagicMock(
+                        return_value={"id": 1234 + call_count, "name": f"D{call_count}"}
+                    ),
+                )
+            return MagicMock(status_code=404)
+
+        mock_http_client.get = AsyncMock(side_effect=mock_get)
+        client._client = mock_http_client
+
+        # High consecutive miss threshold so iteration limit is what stops us
+        result = await client.list_domains(max_consecutive_misses=100)
+
+        # Should hit iteration limit (20) before finding all 5 domains
+        assert call_count == 20
+        assert len(result) == 5  # Found 5 domains (at calls 4, 8, 12, 16, 20)
+
+    @pytest.mark.asyncio
+    async def test_list_domains_respects_custom_max_iterations(self, client):
+        """Test list_domains respects custom max_iterations parameter."""
+        mock_http_client = AsyncMock()
+
+        company_response = MagicMock()
+        company_response.status_code = 200
+        company_response.json.return_value = {"id": 1234, "domains": 100}
+        company_response.raise_for_status = MagicMock()
+        mock_http_client.request.return_value = company_response
+
+        call_count = 0
+
+        def mock_get(url):
+            nonlocal call_count
+            call_count += 1
+            # Alternate success/fail to prevent consecutive_misses limit
+            if call_count % 2 == 0:
+                return MagicMock(
+                    status_code=200,
+                    json=MagicMock(
+                        return_value={"id": 1234 + call_count, "name": f"D{call_count}"}
+                    ),
+                )
+            return MagicMock(status_code=404)
+
+        mock_http_client.get = AsyncMock(side_effect=mock_get)
+        client._client = mock_http_client
+
+        result = await client.list_domains(max_iterations=10, max_consecutive_misses=100)
+
+        assert call_count == 10
+        assert len(result) == 5  # Found 5 domains in 10 iterations
+
+    @pytest.mark.asyncio
+    async def test_list_domains_iteration_limit_prevents_unbounded_scan(self, client):
+        """Test iteration limit prevents scanning when domain_count is unrealistically high."""
+        mock_http_client = AsyncMock()
+
+        # API reports 1000 domains but they don't exist
+        company_response = MagicMock()
+        company_response.status_code = 200
+        company_response.json.return_value = {"id": 1234, "domains": 1000}
+        company_response.raise_for_status = MagicMock()
+        mock_http_client.request.return_value = company_response
+
+        call_count = 0
+
+        def mock_get(url):
+            nonlocal call_count
+            call_count += 1
+            # Every 10th request succeeds to prevent consecutive_misses
+            if call_count % 10 == 0:
+                return MagicMock(
+                    status_code=200,
+                    json=MagicMock(
+                        return_value={"id": 1234 + call_count, "name": f"D{call_count}"}
+                    ),
+                )
+            return MagicMock(status_code=404)
+
+        mock_http_client.get = AsyncMock(side_effect=mock_get)
+        client._client = mock_http_client
+
+        await client.list_domains(max_iterations=50, max_consecutive_misses=20)
+
+        # Should stop at iteration limit, not scan 1000+ IDs
+        assert call_count == 50
+
+
+class TestListDomainsEdgeCases:
+    """Edge case tests for list_domains."""
+
+    @pytest.mark.asyncio
+    async def test_list_domains_zero_domains_returns_empty_immediately(self, client):
+        """Test list_domains returns empty list when company has 0 domains."""
+        mock_http_client = AsyncMock()
+
+        company_response = MagicMock()
+        company_response.status_code = 200
+        company_response.json.return_value = {"id": 1234, "domains": 0}
+        company_response.raise_for_status = MagicMock()
+        mock_http_client.request.return_value = company_response
+        mock_http_client.get = AsyncMock()
+        client._client = mock_http_client
+
+        result = await client.list_domains()
+
+        assert result == []
+        mock_http_client.get.assert_not_called()  # No scanning should occur
+
+    @pytest.mark.asyncio
+    async def test_list_domains_handles_403_status(self, client):
+        """Test list_domains handles 403 Forbidden as consecutive miss."""
+        mock_http_client = AsyncMock()
+
+        company_response = MagicMock()
+        company_response.status_code = 200
+        company_response.json.return_value = {"id": 1234, "domains": 1}
+        company_response.raise_for_status = MagicMock()
+        mock_http_client.request.return_value = company_response
+
+        call_count = 0
+
+        def mock_get(url):
+            nonlocal call_count
+            call_count += 1
+            return MagicMock(status_code=403)
+
+        mock_http_client.get = AsyncMock(side_effect=mock_get)
+        client._client = mock_http_client
+
+        result = await client.list_domains(max_consecutive_misses=3)
+
+        assert result == []
+        assert call_count == 3  # 403 counts as miss
+
+    @pytest.mark.asyncio
+    async def test_list_domains_handles_timeout_exception(self, client):
+        """Test list_domains handles httpx.TimeoutException as consecutive miss."""
+        mock_http_client = AsyncMock()
+
+        company_response = MagicMock()
+        company_response.status_code = 200
+        company_response.json.return_value = {"id": 1234, "domains": 1}
+        company_response.raise_for_status = MagicMock()
+        mock_http_client.request.return_value = company_response
+        mock_http_client.get = AsyncMock(side_effect=httpx.TimeoutException("Timeout"))
+        client._client = mock_http_client
+
+        result = await client.list_domains(max_consecutive_misses=2)
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_list_domains_handles_connect_error(self, client):
+        """Test list_domains handles httpx.ConnectError as consecutive miss."""
+        mock_http_client = AsyncMock()
+
+        company_response = MagicMock()
+        company_response.status_code = 200
+        company_response.json.return_value = {"id": 1234, "domains": 1}
+        company_response.raise_for_status = MagicMock()
+        mock_http_client.request.return_value = company_response
+        mock_http_client.get = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
+        client._client = mock_http_client
+
+        result = await client.list_domains(max_consecutive_misses=2)
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_list_domains_starts_at_company_id(self, client):
+        """Test list_domains starts scanning from company_id."""
+        mock_http_client = AsyncMock()
+
+        company_response = MagicMock()
+        company_response.status_code = 200
+        company_response.json.return_value = {"id": 5000, "domains": 1}
+        company_response.raise_for_status = MagicMock()
+        mock_http_client.request.return_value = company_response
+
+        requested_urls = []
+
+        def mock_get(url):
+            requested_urls.append(url)
+            return MagicMock(
+                status_code=200,
+                json=MagicMock(return_value={"id": 5000, "name": "Domain"}),
+            )
+
+        mock_http_client.get = AsyncMock(side_effect=mock_get)
+        client._client = mock_http_client
+
+        await client.list_domains(company_id=5000)
+
+        # First scan request should be for domain ID 5000
+        assert "/domains/5000" in requested_urls[0]
+
+    @pytest.mark.asyncio
+    async def test_list_domains_scans_forward_only(self, client):
+        """Test list_domains only scans IDs >= company_id (forward direction)."""
+        mock_http_client = AsyncMock()
+
+        company_response = MagicMock()
+        company_response.status_code = 200
+        company_response.json.return_value = {"id": 100, "domains": 3}
+        company_response.raise_for_status = MagicMock()
+        mock_http_client.request.return_value = company_response
+
+        requested_ids = []
+
+        def mock_get(url):
+            domain_id = int(url.split("/domains/")[1])
+            requested_ids.append(domain_id)
+            return MagicMock(
+                status_code=200,
+                json=MagicMock(return_value={"id": domain_id, "name": f"D{domain_id}"}),
+            )
+
+        mock_http_client.get = AsyncMock(side_effect=mock_get)
+        client._client = mock_http_client
+
+        await client.list_domains(company_id=100)
+
+        # All requested IDs should be >= company_id (100)
+        assert all(id >= 100 for id in requested_ids)
+        # IDs should be sequential: 100, 101, 102
+        assert requested_ids == [100, 101, 102]
