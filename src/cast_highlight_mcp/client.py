@@ -194,61 +194,92 @@ class HighlightClient:
         return await self.get(f"/companies/{cid}")
 
     # Domain endpoints
-    async def list_domains(self, company_id: int | None = None, delay: float = 0) -> list[dict]:
+    async def list_domains(
+        self,
+        company_id: int | None = None,
+        delay: float = 0,
+        max_consecutive_misses: int = 5,
+        max_iterations: int | None = None,
+    ) -> list[dict]:
         """List all domains for a company by scanning accessible domain IDs.
 
         Args:
             company_id: Optional company ID (uses config default if not provided)
             delay: Delay in seconds between requests for rate limiting (default: 0).
                    Must be non-negative.
+            max_consecutive_misses: Stop scanning after this many consecutive
+                   non-200 responses (default: 5). Helps avoid unnecessary requests
+                   when domain IDs are not contiguous.
+            max_iterations: Maximum number of domain IDs to scan (default: None,
+                   which uses max(domain_count * 3, 20) as a safety limit).
 
         Returns:
             List of domain dictionaries found during scanning. May be fewer than
             the expected domain count if authentication or network errors occur.
 
         Raises:
-            ValueError: If delay is negative.
+            ValueError: If delay is negative, max_consecutive_misses < 1, or
+                max_iterations < 1 (when provided).
 
         Note:
-            This method scans a range of domain IDs around the company ID since
-            the API does not provide a direct list endpoint. Authentication errors
-            (401/403) are logged as warnings; network errors are logged at debug level.
+            This method scans domain IDs starting from the company ID since
+            the API does not provide a direct list endpoint. Domain IDs are
+            typically assigned sequentially starting at the company ID.
+            All scanning errors (auth, network) are logged at debug level.
         """
         if delay < 0:
             raise ValueError("delay must be non-negative")
+        if max_consecutive_misses < 1:
+            raise ValueError("max_consecutive_misses must be at least 1")
+        if max_iterations is not None and max_iterations < 1:
+            raise ValueError("max_iterations must be at least 1")
 
         cid = company_id or self.config.company_id
         # Get company info to know domain count
         company = await self.get(f"/companies/{cid}")
-        domain_count = company.get("domains", 0)
+        # Handle None from API (e.g., "domains": null) by coercing to 0
+        domain_count = company.get("domains") or 0
 
-        # Scan for domains near company ID (API doesn't have list endpoint)
+        # Calculate iteration limit to prevent unbounded scanning
+        iteration_limit = (
+            max_iterations if max_iterations is not None else max(domain_count * 3, 20)
+        )
+
+        # Scan for domains starting at company ID (API doesn't have list endpoint)
+        # Domain IDs are typically sequential starting from company ID
         found_domains: list[dict] = []
         client = await self._get_client()
 
-        # Scan range around company ID
-        is_first_request = True
-        for offset in range(-10, 50):
-            if len(found_domains) >= domain_count:
-                break
+        # Get request context once for correlation (doesn't change during scan)
+        ctx = get_current_context()
+        request_id = ctx.request_id if ctx else "no-context"
 
+        # Scan forward from company ID
+        is_first_request = True
+        consecutive_misses = 0
+        offset = 0
+        while (
+            len(found_domains) < domain_count
+            and consecutive_misses < max_consecutive_misses
+            and offset < iteration_limit
+        ):
             # Rate limiting between requests (not before first request)
             if delay > 0 and not is_first_request:
                 await asyncio.sleep(delay)
             is_first_request = False
 
             domain_id = cid + offset
-            # Get request context for correlation
-            ctx = get_current_context()
-            request_id = ctx.request_id if ctx else "no-context"
+            offset += 1
 
             try:
                 url = f"{self.base_url}/domains/{domain_id}"
                 response = await client.get(url)
                 if response.status_code == 200:
                     found_domains.append(response.json())
+                    consecutive_misses = 0  # Reset on success
                 elif response.status_code in (401, 403):
-                    logger.warning(
+                    consecutive_misses += 1
+                    logger.debug(
                         "Authentication error scanning domain",
                         extra={
                             "context": {
@@ -258,8 +289,11 @@ class HighlightClient:
                             }
                         },
                     )
-                # 404 is expected during scanning, don't log
+                else:
+                    # 404 or other status - count as miss
+                    consecutive_misses += 1
             except httpx.TimeoutException as e:
+                consecutive_misses += 1
                 logger.debug(
                     "Timeout scanning domain",
                     extra={
@@ -272,6 +306,7 @@ class HighlightClient:
                     },
                 )
             except httpx.ConnectError as e:
+                consecutive_misses += 1
                 logger.debug(
                     "Connection error scanning domain",
                     extra={
@@ -284,6 +319,7 @@ class HighlightClient:
                     },
                 )
             except httpx.RequestError as e:
+                consecutive_misses += 1
                 logger.debug(
                     "Request error scanning domain",
                     extra={
@@ -296,6 +332,7 @@ class HighlightClient:
                     },
                 )
             except Exception as e:
+                consecutive_misses += 1
                 logger.debug(
                     "Unexpected error scanning domain",
                     extra={

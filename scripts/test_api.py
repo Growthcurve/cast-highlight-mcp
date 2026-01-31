@@ -8,8 +8,8 @@ from pathlib import Path
 # Add src to path for development
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from highlight_mcp.client import HighlightClient
-from highlight_mcp.config import load_config
+from cast_highlight_mcp.client import HighlightClient
+from cast_highlight_mcp.config import load_config
 
 
 async def main():
