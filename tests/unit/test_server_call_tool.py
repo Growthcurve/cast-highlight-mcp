@@ -109,6 +109,45 @@ class TestExtractApiVersion:
         url = "https://custom.api.com/rest/v3-beta"
         assert _extract_api_version(url) == "v3-beta"
 
+    def test_extract_returns_unknown_for_non_version_path(self):
+        """Test returns 'unknown' when path ends with non-version segment like /api."""
+        url = "https://example.com/api"
+        assert _extract_api_version(url) == "unknown"
+
+    def test_extract_returns_unknown_for_rest_path(self):
+        """Test returns 'unknown' when path ends with /rest."""
+        url = "https://example.com/rest"
+        assert _extract_api_version(url) == "unknown"
+
+    def test_extract_returns_unknown_for_graphql_path(self):
+        """Test returns 'unknown' when path ends with /graphql."""
+        url = "https://example.com/graphql"
+        assert _extract_api_version(url) == "unknown"
+
+    def test_extract_ws1_version(self):
+        """Test extracting WS1 version."""
+        url = "https://app.casthighlight.com/WS1"
+        assert _extract_api_version(url) == "WS1"
+
+    def test_extract_version_case_insensitive(self):
+        """Test version extraction is case-insensitive."""
+        # Lowercase v
+        assert _extract_api_version("https://example.com/v2") == "v2"
+        # Uppercase V
+        assert _extract_api_version("https://example.com/V2") == "V2"
+        # Lowercase ws
+        assert _extract_api_version("https://example.com/ws2") == "ws2"
+
+    def test_extract_v10_and_higher(self):
+        """Test extracting double-digit versions like v10, v20."""
+        assert _extract_api_version("https://example.com/v10") == "v10"
+        assert _extract_api_version("https://example.com/v20") == "v20"
+
+    def test_extract_returns_unknown_for_services_path(self):
+        """Test returns 'unknown' for paths like /services."""
+        url = "https://example.com/services"
+        assert _extract_api_version(url) == "unknown"
+
 
 class TestCallToolGetCompany:
     """Tests for highlight_get_company tool."""
