@@ -638,7 +638,7 @@ class TestSanitizeErrorMessage:
         """Test RuntimeError for uninitialized client."""
         from cast_highlight_mcp.server import _sanitize_error_message
 
-        error = RuntimeError("Client not initialized. Server must be started with run_server().")
+        error = RuntimeError("Client not initialized. Server lifecycle not started.")
         result = _sanitize_error_message(error)
         assert result == "Server error: Service not ready"
 
