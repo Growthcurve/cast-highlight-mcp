@@ -101,6 +101,11 @@ class TestLoadConfig:
 class TestLoadConfigRetrySettings:
     """Tests for retry configuration in load_config (Issue #2)."""
 
+    @pytest.fixture(autouse=True)
+    def isolate_from_dotenv(self, monkeypatch):
+        """Prevent load_dotenv from reading .env files during tests."""
+        monkeypatch.setattr("cast_highlight_mcp.config.load_dotenv", lambda: None)
+
     def test_load_config_default_retry_attempts(self, monkeypatch):
         """Test loading config uses default retry_attempts=3."""
         monkeypatch.setenv("HIGHLIGHT_BASE_URL", "https://test.casthighlight.com/WS2")

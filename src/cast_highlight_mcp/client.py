@@ -219,8 +219,14 @@ class HighlightClient:
         except httpx.TimeoutException:
             total_duration_ms = (time.perf_counter() - overall_start_time) * 1000
             try:
+                # Use accurate message based on whether retries occurred
+                msg = (
+                    "HTTP request timeout after retries"
+                    if attempt_number > 1
+                    else "HTTP request timeout"
+                )
                 logger.warning(
-                    "HTTP request timeout after retries",
+                    msg,
                     extra={
                         "context": {
                             "method": method,
@@ -261,8 +267,14 @@ class HighlightClient:
         except httpx.RequestError as e:
             total_duration_ms = (time.perf_counter() - overall_start_time) * 1000
             try:
+                # Use accurate message based on whether retries occurred
+                msg = (
+                    "HTTP request failed after retries"
+                    if attempt_number > 1
+                    else "HTTP request failed"
+                )
                 logger.error(
-                    "HTTP request failed after retries",
+                    msg,
                     extra={
                         "context": {
                             "method": method,
