@@ -10,7 +10,7 @@ from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
 from .client import HighlightClient
-from .config import load_config
+from .config import Config, load_config
 from .observability import (
     configure_logging,
     get_logger,
@@ -26,6 +26,30 @@ logger = get_logger(__name__)
 
 # Client instance managed by lifecycle
 _client: HighlightClient | None = None
+_config: Config | None = None
+
+
+def _extract_api_version(base_url: str) -> str:
+    """Extract API version identifier from the base URL.
+
+    Parses the base_url path to find version identifiers like "WS2", "v1", "v2", etc.
+    Falls back to "unknown" if no version can be determined.
+
+    Args:
+        base_url: The configured API base URL (e.g., "https://app.casthighlight.com/WS2")
+
+    Returns:
+        The API version string extracted from the URL path, or "unknown" if not found.
+    """
+    from urllib.parse import urlparse
+
+    parsed = urlparse(base_url)
+    # Get the last path segment (e.g., "/WS2" -> "WS2", "/api/v2" -> "v2")
+    path_parts = [p for p in parsed.path.split("/") if p]
+    if path_parts:
+        # Return the last path component as the version identifier
+        return path_parts[-1]
+    return "unknown"
 
 
 def get_client() -> HighlightClient:
@@ -40,6 +64,20 @@ def get_client() -> HighlightClient:
     if _client is None:
         raise RuntimeError("Client not initialized. Server must be started with run_server().")
     return _client
+
+
+def get_config() -> Config:
+    """Get the loaded configuration.
+
+    Returns:
+        The Config instance.
+
+    Raises:
+        RuntimeError: If called before config is loaded.
+    """
+    if _config is None:
+        raise RuntimeError("Config not loaded. Server must be started with run_server().")
+    return _config
 
 
 # Define tools
@@ -306,22 +344,31 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 result = await api.get_benchmark()
             elif name == "highlight_health_check":
                 # Health check: verify API connectivity by calling get_company
+                # Extract API version from configured base_url for accurate reporting
+                config = get_config()
+                api_version = _extract_api_version(config.base_url)
                 try:
                     company = await api.get_company()
                     result = {
                         "status": "healthy",
                         "company_name": company.get("name", "Unknown"),
                         "company_id": company.get("id"),
-                        "api_version": "WS2",
+                        "api_version": api_version,
                         "message": "Successfully connected to CAST Highlight API",
                     }
                 except Exception as health_error:
-                    # Return unhealthy status with error info
+                    # Health check exceptions are caught here intentionally.
+                    # Returning "unhealthy" status IS a successful tool execution - the tool
+                    # correctly reported the health state. This is different from the tool
+                    # itself failing. The outer call_tool metrics will show success=True
+                    # because the tool executed its contract correctly. For monitoring
+                    # API connectivity issues, consumers should check the "status" field
+                    # in the response, not the tool execution success.
                     result = {
                         "status": "unhealthy",
                         "company_name": None,
                         "company_id": None,
-                        "api_version": "WS2",
+                        "api_version": api_version,
                         "message": _sanitize_error_message(health_error),
                     }
             else:
@@ -401,7 +448,7 @@ def main():
     configure_logging()
 
     async def run():
-        global _client
+        global _client, _config
 
         # Log server starting
         logger.info(
@@ -416,8 +463,8 @@ def main():
         try:
             async with AsyncExitStack() as stack:
                 # Initialize client with proper lifecycle management
-                config = load_config()
-                _client = await stack.enter_async_context(HighlightClient(config))
+                _config = load_config()
+                _client = await stack.enter_async_context(HighlightClient(_config))
 
                 # Log server ready
                 logger.info(

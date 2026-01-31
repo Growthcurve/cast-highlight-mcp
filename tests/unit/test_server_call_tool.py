@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from cast_highlight_mcp import server
-from cast_highlight_mcp.server import call_tool, get_client
+from cast_highlight_mcp.server import _extract_api_version, call_tool, get_client, get_config
 
 
 class TestGetClient:
@@ -37,6 +37,77 @@ class TestGetClient:
         finally:
             # Restore original state
             server._client = original_client
+
+
+class TestGetConfig:
+    """Tests for get_config function."""
+
+    def test_get_config_raises_when_not_loaded(self):
+        """Test get_config raises RuntimeError when config is not loaded."""
+        original_config = server._config
+        server._config = None
+
+        try:
+            with pytest.raises(RuntimeError, match="Config not loaded"):
+                get_config()
+        finally:
+            server._config = original_config
+
+    def test_get_config_returns_existing_config(self):
+        """Test get_config returns existing config if available."""
+        original_config = server._config
+        mock_config = MagicMock()
+        server._config = mock_config
+
+        try:
+            result = get_config()
+            assert result is mock_config
+        finally:
+            server._config = original_config
+
+
+class TestExtractApiVersion:
+    """Tests for _extract_api_version function."""
+
+    def test_extract_ws2_from_standard_url(self):
+        """Test extracting WS2 from standard CAST Highlight URL."""
+        url = "https://app.casthighlight.com/WS2"
+        assert _extract_api_version(url) == "WS2"
+
+    def test_extract_version_from_nested_path(self):
+        """Test extracting version from nested path like /api/v2."""
+        url = "https://api.example.com/api/v2"
+        assert _extract_api_version(url) == "v2"
+
+    def test_extract_version_v1(self):
+        """Test extracting v1 version."""
+        url = "https://api.example.com/v1"
+        assert _extract_api_version(url) == "v1"
+
+    def test_extract_returns_unknown_for_no_path(self):
+        """Test returns 'unknown' when URL has no path."""
+        url = "https://api.example.com"
+        assert _extract_api_version(url) == "unknown"
+
+    def test_extract_returns_unknown_for_root_path(self):
+        """Test returns 'unknown' when URL has only root path."""
+        url = "https://api.example.com/"
+        assert _extract_api_version(url) == "unknown"
+
+    def test_extract_handles_trailing_slash(self):
+        """Test extracting version when URL has trailing slash."""
+        url = "https://app.casthighlight.com/WS2/"
+        assert _extract_api_version(url) == "WS2"
+
+    def test_extract_with_query_params(self):
+        """Test extracting version with query parameters present."""
+        url = "https://app.casthighlight.com/WS2?token=abc"
+        assert _extract_api_version(url) == "WS2"
+
+    def test_extract_custom_api_version(self):
+        """Test extracting custom API version identifier."""
+        url = "https://custom.api.com/rest/v3-beta"
+        assert _extract_api_version(url) == "v3-beta"
 
 
 class TestCallToolGetCompany:
@@ -592,8 +663,15 @@ class TestSanitizeErrorMessage:
 class TestCallToolHealthCheck:
     """Tests for highlight_health_check tool."""
 
+    @pytest.fixture
+    def mock_config(self):
+        """Create a mock config with standard base_url."""
+        config = MagicMock()
+        config.base_url = "https://app.casthighlight.com/WS2"
+        return config
+
     @pytest.mark.asyncio
-    async def test_health_check_success(self):
+    async def test_health_check_success(self, mock_config):
         """Test highlight_health_check returns healthy status when API is accessible."""
         mock_client = AsyncMock()
         mock_client.get_company.return_value = {
@@ -602,7 +680,10 @@ class TestCallToolHealthCheck:
             "status": "active",
         }
 
-        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
+        with (
+            patch("cast_highlight_mcp.server.get_client", return_value=mock_client),
+            patch("cast_highlight_mcp.server.get_config", return_value=mock_config),
+        ):
             result = await call_tool("highlight_health_check", {})
 
         assert len(result) == 1
@@ -616,7 +697,7 @@ class TestCallToolHealthCheck:
         mock_client.get_company.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_health_check_unhealthy_on_connection_error(self):
+    async def test_health_check_unhealthy_on_connection_error(self, mock_config):
         """Test highlight_health_check returns unhealthy status on connection error."""
         import httpx
 
@@ -625,7 +706,10 @@ class TestCallToolHealthCheck:
             "Failed to connect to api.casthighlight.com"
         )
 
-        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
+        with (
+            patch("cast_highlight_mcp.server.get_client", return_value=mock_client),
+            patch("cast_highlight_mcp.server.get_config", return_value=mock_config),
+        ):
             result = await call_tool("highlight_health_check", {})
 
         assert len(result) == 1
@@ -637,7 +721,7 @@ class TestCallToolHealthCheck:
         assert "Unable to connect" in data["message"]
 
     @pytest.mark.asyncio
-    async def test_health_check_unhealthy_on_auth_error(self):
+    async def test_health_check_unhealthy_on_auth_error(self, mock_config):
         """Test highlight_health_check returns unhealthy status on authentication error."""
         import httpx
 
@@ -648,7 +732,10 @@ class TestCallToolHealthCheck:
             response=MagicMock(status_code=401),
         )
 
-        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
+        with (
+            patch("cast_highlight_mcp.server.get_client", return_value=mock_client),
+            patch("cast_highlight_mcp.server.get_config", return_value=mock_config),
+        ):
             result = await call_tool("highlight_health_check", {})
 
         assert len(result) == 1
@@ -659,14 +746,17 @@ class TestCallToolHealthCheck:
         assert "Authentication failed" in data["message"]
 
     @pytest.mark.asyncio
-    async def test_health_check_unhealthy_on_timeout(self):
+    async def test_health_check_unhealthy_on_timeout(self, mock_config):
         """Test highlight_health_check returns unhealthy status on timeout."""
         import httpx
 
         mock_client = AsyncMock()
         mock_client.get_company.side_effect = httpx.TimeoutException("Connection timed out")
 
-        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
+        with (
+            patch("cast_highlight_mcp.server.get_client", return_value=mock_client),
+            patch("cast_highlight_mcp.server.get_config", return_value=mock_config),
+        ):
             result = await call_tool("highlight_health_check", {})
 
         assert len(result) == 1
@@ -676,7 +766,7 @@ class TestCallToolHealthCheck:
         assert "timed out" in data["message"]
 
     @pytest.mark.asyncio
-    async def test_health_check_unhealthy_on_server_error(self):
+    async def test_health_check_unhealthy_on_server_error(self, mock_config):
         """Test highlight_health_check returns unhealthy status on server error."""
         import httpx
 
@@ -687,7 +777,10 @@ class TestCallToolHealthCheck:
             response=MagicMock(status_code=500),
         )
 
-        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
+        with (
+            patch("cast_highlight_mcp.server.get_client", return_value=mock_client),
+            patch("cast_highlight_mcp.server.get_config", return_value=mock_config),
+        ):
             result = await call_tool("highlight_health_check", {})
 
         assert len(result) == 1
@@ -696,7 +789,7 @@ class TestCallToolHealthCheck:
         assert "Server error" in data["message"]
 
     @pytest.mark.asyncio
-    async def test_health_check_with_missing_company_name(self):
+    async def test_health_check_with_missing_company_name(self, mock_config):
         """Test highlight_health_check handles missing company name gracefully."""
         mock_client = AsyncMock()
         mock_client.get_company.return_value = {
@@ -704,7 +797,10 @@ class TestCallToolHealthCheck:
             # name is missing
         }
 
-        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
+        with (
+            patch("cast_highlight_mcp.server.get_client", return_value=mock_client),
+            patch("cast_highlight_mcp.server.get_config", return_value=mock_config),
+        ):
             result = await call_tool("highlight_health_check", {})
 
         data = json.loads(result[0].text)
@@ -713,12 +809,15 @@ class TestCallToolHealthCheck:
         assert data["company_id"] == 5678
 
     @pytest.mark.asyncio
-    async def test_health_check_unhealthy_on_generic_exception(self):
+    async def test_health_check_unhealthy_on_generic_exception(self, mock_config):
         """Test highlight_health_check returns unhealthy status on generic exception."""
         mock_client = AsyncMock()
         mock_client.get_company.side_effect = Exception("Unexpected internal error")
 
-        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
+        with (
+            patch("cast_highlight_mcp.server.get_client", return_value=mock_client),
+            patch("cast_highlight_mcp.server.get_config", return_value=mock_config),
+        ):
             result = await call_tool("highlight_health_check", {})
 
         assert len(result) == 1
@@ -726,3 +825,44 @@ class TestCallToolHealthCheck:
         assert data["status"] == "unhealthy"
         assert data["company_name"] is None
         assert "unexpected error" in data["message"].lower()
+
+    @pytest.mark.asyncio
+    async def test_health_check_extracts_api_version_from_config(self):
+        """Test highlight_health_check extracts api_version from configured base_url."""
+        mock_client = AsyncMock()
+        mock_client.get_company.return_value = {"id": 1234, "name": "Test"}
+
+        # Use a different API version in the base_url
+        mock_config = MagicMock()
+        mock_config.base_url = "https://api.example.com/v3"
+
+        with (
+            patch("cast_highlight_mcp.server.get_client", return_value=mock_client),
+            patch("cast_highlight_mcp.server.get_config", return_value=mock_config),
+        ):
+            result = await call_tool("highlight_health_check", {})
+
+        data = json.loads(result[0].text)
+        assert data["status"] == "healthy"
+        assert data["api_version"] == "v3"  # Should match the path from base_url
+
+    @pytest.mark.asyncio
+    async def test_health_check_api_version_in_unhealthy_response(self):
+        """Test api_version is included in unhealthy response from configured base_url."""
+        import httpx
+
+        mock_client = AsyncMock()
+        mock_client.get_company.side_effect = httpx.ConnectError("Connection failed")
+
+        mock_config = MagicMock()
+        mock_config.base_url = "https://api.example.com/api/v2-beta"
+
+        with (
+            patch("cast_highlight_mcp.server.get_client", return_value=mock_client),
+            patch("cast_highlight_mcp.server.get_config", return_value=mock_config),
+        ):
+            result = await call_tool("highlight_health_check", {})
+
+        data = json.loads(result[0].text)
+        assert data["status"] == "unhealthy"
+        assert data["api_version"] == "v2-beta"  # Should still include version from config
