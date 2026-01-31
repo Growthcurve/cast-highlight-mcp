@@ -17,6 +17,14 @@ from .observability import (
     get_metrics_collector,
     request_context,
 )
+from .validation import (
+    ValidationError,
+    validate_application_args,
+    validate_get_company_args,
+    validate_get_domain_args,
+    validate_list_applications_args,
+    validate_list_domains_args,
+)
 
 # Initialize server
 server = Server("cast-highlight-mcp")
@@ -240,7 +248,9 @@ def _classify_error(exception: Exception) -> str:
     Returns:
         Error type string for metrics
     """
-    if isinstance(exception, httpx.HTTPStatusError):
+    if isinstance(exception, ValidationError):
+        return "validation"
+    elif isinstance(exception, httpx.HTTPStatusError):
         status = exception.response.status_code
         return f"http_{status}"
     elif isinstance(exception, httpx.TimeoutException):
@@ -292,6 +302,9 @@ def _sanitize_error_message(exception: Exception) -> str:
     elif isinstance(exception, ValueError):
         # ValueError may contain user input, so sanitize it
         return "Validation error: Invalid argument value"
+    elif isinstance(exception, ValidationError):
+        # ValidationError contains field name and message which are safe to expose
+        return f"Validation error: {exception.message} (field: {exception.field})"
     elif isinstance(exception, KeyError):
         # KeyError contains the missing key name which is safe to expose
         key = str(exception).strip("'\"")
@@ -319,27 +332,38 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
         try:
             if name == "highlight_get_company":
-                result = await api.get_company(arguments.get("company_id"))
+                validated = validate_get_company_args(arguments)
+                result = await api.get_company(validated.company_id)
             elif name == "highlight_list_domains":
-                result = await api.list_domains(arguments.get("company_id"))
+                validated = validate_list_domains_args(arguments)
+                result = await api.list_domains(validated.company_id)
             elif name == "highlight_get_domain":
-                result = await api.get_domain(arguments["domain_id"])
+                validated = validate_get_domain_args(arguments)
+                result = await api.get_domain(validated.domain_id)
             elif name == "highlight_list_applications":
-                result = await api.get_domain_applications(arguments["domain_id"])
+                validated = validate_list_applications_args(arguments)
+                result = await api.get_domain_applications(validated.domain_id)
             elif name == "highlight_get_application":
-                result = await api.get_application(arguments["application_id"])
+                validated = validate_application_args(arguments)
+                result = await api.get_application(validated.application_id)
             elif name == "highlight_get_metrics":
-                result = await api.get_application_metrics(arguments["application_id"])
+                validated = validate_application_args(arguments)
+                result = await api.get_application_metrics(validated.application_id)
             elif name == "highlight_get_technologies":
-                result = await api.get_application_technologies(arguments["application_id"])
+                validated = validate_application_args(arguments)
+                result = await api.get_application_technologies(validated.application_id)
             elif name == "highlight_get_cloud_readiness":
-                result = await api.get_application_cloud_readiness(arguments["application_id"])
+                validated = validate_application_args(arguments)
+                result = await api.get_application_cloud_readiness(validated.application_id)
             elif name == "highlight_get_green_impact":
-                result = await api.get_application_green_impact(arguments["application_id"])
+                validated = validate_application_args(arguments)
+                result = await api.get_application_green_impact(validated.application_id)
             elif name == "highlight_get_cves":
-                result = await api.get_application_cves(arguments["application_id"])
+                validated = validate_application_args(arguments)
+                result = await api.get_application_cves(validated.application_id)
             elif name == "highlight_get_third_parties":
-                result = await api.get_application_third_parties(arguments["application_id"])
+                validated = validate_application_args(arguments)
+                result = await api.get_application_third_parties(validated.application_id)
             elif name == "highlight_get_benchmark":
                 result = await api.get_benchmark()
             elif name == "highlight_health_check":

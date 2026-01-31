@@ -393,15 +393,17 @@ class TestCallToolErrorHandling:
         assert "An unexpected error occurred" in result[0].text
 
     @pytest.mark.asyncio
-    async def test_key_error_returns_sanitized_message(self):
-        """Test KeyError for missing required argument returns sanitized message."""
+    async def test_missing_required_argument_returns_validation_error(self):
+        """Test missing required argument returns validation error message."""
         mock_client = AsyncMock()
 
         with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
             result = await call_tool("highlight_get_domain", {})
 
         assert len(result) == 1
-        assert "Missing required argument: domain_id" in result[0].text
+        assert "Validation error" in result[0].text
+        assert "domain_id" in result[0].text
+        assert "required" in result[0].text
 
     @pytest.mark.asyncio
     async def test_http_404_error_returns_sanitized_message(self):
