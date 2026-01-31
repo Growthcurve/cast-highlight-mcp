@@ -76,17 +76,17 @@ def validate_positive_integer(value: Any, field_name: str, required: bool = Fals
         try:
             value = int(value)
         except ValueError:
-            raise ValidationError(field_name, f"must be an integer, got string '{value}'")
+            raise ValidationError(field_name, "must be a valid integer")
 
     if not isinstance(value, int):
-        raise ValidationError(field_name, f"must be an integer, got {type(value).__name__}")
+        raise ValidationError(field_name, "must be an integer")
 
     # Check for boolean (which is a subclass of int in Python)
     if isinstance(value, bool):
-        raise ValidationError(field_name, "must be an integer, got boolean")
+        raise ValidationError(field_name, "must be an integer")
 
     if value <= 0:
-        raise ValidationError(field_name, f"must be a positive integer, got {value}")
+        raise ValidationError(field_name, "must be a positive integer")
 
     # Check for reasonable upper bound (prevent potential overflow/abuse)
     max_id = 2**31 - 1  # Max 32-bit signed integer

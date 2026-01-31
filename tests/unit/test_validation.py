@@ -78,7 +78,7 @@ class TestValidatePositiveInteger:
         with pytest.raises(ValidationError) as exc_info:
             validate_positive_integer("abc", "test_field")
         assert exc_info.value.field == "test_field"
-        assert "must be an integer" in exc_info.value.message
+        assert "must be a valid integer" in exc_info.value.message
 
     def test_float_raises_error(self):
         """Test floats are rejected."""
@@ -92,11 +92,11 @@ class TestValidatePositiveInteger:
         with pytest.raises(ValidationError) as exc_info:
             validate_positive_integer(True, "test_field")
         assert exc_info.value.field == "test_field"
-        assert "boolean" in exc_info.value.message
+        assert "must be an integer" in exc_info.value.message
 
         with pytest.raises(ValidationError) as exc_info:
             validate_positive_integer(False, "test_field")
-        assert "boolean" in exc_info.value.message
+        assert "must be an integer" in exc_info.value.message
 
     def test_list_raises_error(self):
         """Test lists are rejected."""
@@ -122,6 +122,34 @@ class TestValidatePositiveInteger:
         with pytest.raises(ValidationError) as exc_info:
             validate_positive_integer(max_val + 1, "test_field")
         assert "exceeds maximum" in exc_info.value.message
+
+    def test_error_message_does_not_contain_user_input(self):
+        """Test that error messages do not expose raw user input (security).
+
+        This prevents potential XSS or information leakage if validation
+        error messages are displayed to users or logged.
+        """
+        # Test with potentially malicious string input
+        malicious_inputs = [
+            "<script>alert(1)</script>",
+            "'; DROP TABLE users; --",
+            "${7*7}",
+            "{{constructor.constructor('return this')()}}",
+        ]
+
+        for malicious_input in malicious_inputs:
+            with pytest.raises(ValidationError) as exc_info:
+                validate_positive_integer(malicious_input, "test_field")
+            # The error message should NOT contain the raw malicious input
+            assert malicious_input not in exc_info.value.message
+            assert malicious_input not in str(exc_info.value)
+
+    def test_error_message_does_not_contain_negative_value(self):
+        """Test that negative value error messages don't expose the value."""
+        with pytest.raises(ValidationError) as exc_info:
+            validate_positive_integer(-999, "test_field")
+        # Should not contain the actual value
+        assert "-999" not in exc_info.value.message
 
 
 class TestValidateCompanyId:
