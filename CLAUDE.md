@@ -46,6 +46,12 @@ make setup          # Create venv, install deps, install pre-commit hooks
 make hooks          # Install pre-commit hooks only (runs on every commit)
 ```
 
+**Note**: If commits fail with `pre-commit not found`, reinstall hooks:
+```bash
+source .venv/bin/activate && pre-commit install
+```
+This can happen after git worktree cleanup when hooks point to deleted paths.
+
 ### Build/Install
 
 ```bash
