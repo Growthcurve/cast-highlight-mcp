@@ -466,6 +466,7 @@ class TestServerMainFunction:
                 return await super().__aexit__(*args)
 
         original_client = server._client
+        original_config = server._config
 
         try:
             with (
@@ -513,6 +514,7 @@ class TestServerMainFunction:
 
         finally:
             server._client = original_client
+            server._config = original_config
 
     def test_main_cleans_up_on_server_run_exception(self, mock_config):
         """Test that main() cleans up resources when server.run() raises an exception.
@@ -521,6 +523,7 @@ class TestServerMainFunction:
         that HighlightClient.__aexit__ is called even when server.run() fails.
         """
         original_client = server._client
+        original_config = server._config
         client_aexit_called = False
         client_aenter_called = False
 
@@ -574,13 +577,17 @@ class TestServerMainFunction:
 
         finally:
             server._client = original_client
+            server._config = original_config
 
     def test_main_cleans_up_stdio_server_on_exit(self, mock_config):
         """Test that main() cleans up the stdio_server context manager on exit.
 
-        This verifies both HighlightClient and stdio_server are properly cleaned up.
+        This test focuses specifically on stdio_server cleanup. For HighlightClient
+        cleanup verification, see test_main_calls_production_startup_sequence and
+        test_main_cleans_up_on_server_run_exception.
         """
         original_client = server._client
+        original_config = server._config
         stdio_aexit_called = False
 
         async def mock_server_run(*args, **kwargs):
@@ -611,6 +618,7 @@ class TestServerMainFunction:
 
         finally:
             server._client = original_client
+            server._config = original_config
 
     @pytest.mark.asyncio
     async def test_async_lifecycle_pattern_matches_production(self, mock_config):
