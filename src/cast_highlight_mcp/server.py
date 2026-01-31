@@ -41,7 +41,7 @@ def _extract_api_version(base_url: str) -> str:
     """Extract API version identifier from the base URL.
 
     Parses the base_url path to find version identifiers like "WS2", "v1", "v2", etc.
-    Falls back to "unknown" if no version can be determined.
+    Falls back to "unknown" if the last path segment doesn't match a version pattern.
 
     Args:
         base_url: The configured API base URL (e.g., "https://app.casthighlight.com/WS2")
@@ -49,14 +49,21 @@ def _extract_api_version(base_url: str) -> str:
     Returns:
         The API version string extracted from the URL path, or "unknown" if not found.
     """
+    import re
     from urllib.parse import urlparse
+
+    # Pattern to match version identifiers like v1, v2, WS2, v3-beta, WS1, etc.
+    # Case-insensitive to handle V1, ws2, etc.
+    version_pattern = re.compile(r"^(v\d+|WS\d+|v\d+-\w+)$", re.IGNORECASE)
 
     parsed = urlparse(base_url)
     # Get the last path segment (e.g., "/WS2" -> "WS2", "/api/v2" -> "v2")
     path_parts = [p for p in parsed.path.split("/") if p]
     if path_parts:
-        # Return the last path component as the version identifier
-        return path_parts[-1]
+        last_segment = path_parts[-1]
+        # Only return if it matches a version pattern
+        if version_pattern.match(last_segment):
+            return last_segment
     return "unknown"
 
 
