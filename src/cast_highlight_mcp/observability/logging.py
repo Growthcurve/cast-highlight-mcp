@@ -21,7 +21,7 @@ import re
 import sys
 import traceback
 from dataclasses import dataclass, field, fields
-from typing import Any
+from typing import Any, MutableMapping
 
 # Sensitive patterns for redaction
 _SENSITIVE_PATTERNS = [
@@ -179,7 +179,7 @@ class StructuredLogFormatter(logging.Formatter):
             JSON-formatted string
         """
         try:
-            entry = {
+            entry: dict[str, Any] = {
                 "timestamp": self._format_timestamp(record.created),
                 "level": record.levelname,
                 "logger": record.name,
@@ -425,12 +425,13 @@ class RedactionFilter(logging.Filter):
                 elif isinstance(record.args, tuple):
                     record.args = tuple(self._redact_value(arg) for arg in record.args)
 
-            # Redact context if present
-            if hasattr(record, "context"):
-                if isinstance(record.context, dict):
-                    record.context = self._redact_dict(record.context)
-                elif isinstance(record.context, LogContext):
-                    record.context.extra = self._redact_dict(record.context.extra)
+            # Redact context if present (context is a dynamic attribute)
+            context = getattr(record, "context", None)
+            if context is not None:
+                if isinstance(context, dict):
+                    setattr(record, "context", self._redact_dict(context))
+                elif isinstance(context, LogContext):
+                    context.extra = self._redact_dict(context.extra)
 
         except Exception:
             # Graceful degradation - don't let redaction failures break logging
@@ -509,7 +510,9 @@ class ContextAwareLogger(logging.LoggerAdapter):
     context information into log records via the 'extra' mechanism.
     """
 
-    def process(self, msg: str, kwargs: dict) -> tuple[str, dict]:
+    def process(
+        self, msg: str, kwargs: MutableMapping[str, Any]
+    ) -> tuple[str, MutableMapping[str, Any]]:
         """Add context to log record.
 
         Args:
