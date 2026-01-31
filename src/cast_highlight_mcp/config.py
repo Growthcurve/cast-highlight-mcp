@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import sys
 from dataclasses import dataclass
@@ -210,22 +211,22 @@ def load_config() -> Config:
         retry_min_wait = float(os.getenv("HIGHLIGHT_RETRY_MIN_WAIT", "1.0"))
     except ValueError as e:
         raise ValueError(f"HIGHLIGHT_RETRY_MIN_WAIT must be a number: {e}") from e
-    if retry_min_wait < 0 or retry_min_wait > 60:
+    if not math.isfinite(retry_min_wait) or retry_min_wait < 0 or retry_min_wait > 60:
         raise ValueError("HIGHLIGHT_RETRY_MIN_WAIT must be between 0 and 60 seconds")
 
     try:
         retry_max_wait = float(os.getenv("HIGHLIGHT_RETRY_MAX_WAIT", "10.0"))
     except ValueError as e:
         raise ValueError(f"HIGHLIGHT_RETRY_MAX_WAIT must be a number: {e}") from e
-    if retry_max_wait < retry_min_wait or retry_max_wait > 120:
+    if not math.isfinite(retry_max_wait) or retry_max_wait < retry_min_wait or retry_max_wait > 120:
         raise ValueError("HIGHLIGHT_RETRY_MAX_WAIT must be >= HIGHLIGHT_RETRY_MIN_WAIT and <= 120")
 
     try:
         retry_multiplier = float(os.getenv("HIGHLIGHT_RETRY_MULTIPLIER", "2.0"))
     except ValueError as e:
         raise ValueError(f"HIGHLIGHT_RETRY_MULTIPLIER must be a number: {e}") from e
-    if retry_multiplier <= 0 or retry_multiplier > 10:
-        raise ValueError("HIGHLIGHT_RETRY_MULTIPLIER must be between 0 and 10")
+    if not math.isfinite(retry_multiplier) or retry_multiplier <= 0 or retry_multiplier > 10:
+        raise ValueError("HIGHLIGHT_RETRY_MULTIPLIER must be greater than 0 and at most 10")
 
     if not base_url:
         raise ValueError("HIGHLIGHT_BASE_URL environment variable is required")
