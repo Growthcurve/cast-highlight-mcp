@@ -189,16 +189,49 @@ def load_config() -> Config:
     base_url = os.getenv("HIGHLIGHT_BASE_URL")
     access_token = os.getenv("HIGHLIGHT_ACCESS_TOKEN")
     company_id = os.getenv("HIGHLIGHT_COMPANY_ID")
-    timeout = int(os.getenv("HIGHLIGHT_TIMEOUT", "30"))
 
-    # Retry configuration
-    retry_attempts = int(os.getenv("HIGHLIGHT_RETRY_ATTEMPTS", "3"))
-    retry_min_wait = float(os.getenv("HIGHLIGHT_RETRY_MIN_WAIT", "1.0"))
-    retry_max_wait = float(os.getenv("HIGHLIGHT_RETRY_MAX_WAIT", "10.0"))
-    retry_multiplier = float(os.getenv("HIGHLIGHT_RETRY_MULTIPLIER", "2.0"))
+    # Parse and validate timeout with bounds
+    try:
+        timeout = int(os.getenv("HIGHLIGHT_TIMEOUT", "30"))
+    except ValueError as e:
+        raise ValueError(f"HIGHLIGHT_TIMEOUT must be an integer: {e}") from e
+    if timeout <= 0 or timeout > 300:
+        raise ValueError("HIGHLIGHT_TIMEOUT must be between 1 and 300 seconds")
+
+    # Parse and validate retry configuration with bounds
+    try:
+        retry_attempts = int(os.getenv("HIGHLIGHT_RETRY_ATTEMPTS", "3"))
+    except ValueError as e:
+        raise ValueError(f"HIGHLIGHT_RETRY_ATTEMPTS must be an integer: {e}") from e
+    if retry_attempts < 1 or retry_attempts > 10:
+        raise ValueError("HIGHLIGHT_RETRY_ATTEMPTS must be between 1 and 10")
+
+    try:
+        retry_min_wait = float(os.getenv("HIGHLIGHT_RETRY_MIN_WAIT", "1.0"))
+    except ValueError as e:
+        raise ValueError(f"HIGHLIGHT_RETRY_MIN_WAIT must be a number: {e}") from e
+    if retry_min_wait < 0 or retry_min_wait > 60:
+        raise ValueError("HIGHLIGHT_RETRY_MIN_WAIT must be between 0 and 60 seconds")
+
+    try:
+        retry_max_wait = float(os.getenv("HIGHLIGHT_RETRY_MAX_WAIT", "10.0"))
+    except ValueError as e:
+        raise ValueError(f"HIGHLIGHT_RETRY_MAX_WAIT must be a number: {e}") from e
+    if retry_max_wait < retry_min_wait or retry_max_wait > 120:
+        raise ValueError("HIGHLIGHT_RETRY_MAX_WAIT must be >= HIGHLIGHT_RETRY_MIN_WAIT and <= 120")
+
+    try:
+        retry_multiplier = float(os.getenv("HIGHLIGHT_RETRY_MULTIPLIER", "2.0"))
+    except ValueError as e:
+        raise ValueError(f"HIGHLIGHT_RETRY_MULTIPLIER must be a number: {e}") from e
+    if retry_multiplier <= 0 or retry_multiplier > 10:
+        raise ValueError("HIGHLIGHT_RETRY_MULTIPLIER must be between 0 and 10")
 
     if not base_url:
         raise ValueError("HIGHLIGHT_BASE_URL environment variable is required")
+    # Security: Require HTTPS to protect bearer token in transit
+    if not base_url.startswith("https://"):
+        raise ValueError("HIGHLIGHT_BASE_URL must use HTTPS for secure token transmission")
     if not access_token:
         raise ValueError("HIGHLIGHT_ACCESS_TOKEN environment variable is required")
     if not company_id:
