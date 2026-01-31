@@ -45,6 +45,7 @@ class TestToolDefinitions:
             "highlight_get_cloud_readiness",
             "highlight_get_cves",
             "highlight_get_benchmark",
+            "highlight_health_check",
         }
         missing = expected - tool_names
         assert not missing, f"Missing expected tools: {missing}"

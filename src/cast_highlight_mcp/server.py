@@ -177,6 +177,14 @@ TOOLS = [
             "properties": {},
         },
     ),
+    Tool(
+        name="highlight_health_check",
+        description="Check the health of the CAST Highlight API connection. Validates credentials, API connectivity, and returns status information.",
+        inputSchema={
+            "type": "object",
+            "properties": {},
+        },
+    ),
 ]
 
 
@@ -296,6 +304,26 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 result = await api.get_application_third_parties(arguments["application_id"])
             elif name == "highlight_get_benchmark":
                 result = await api.get_benchmark()
+            elif name == "highlight_health_check":
+                # Health check: verify API connectivity by calling get_company
+                try:
+                    company = await api.get_company()
+                    result = {
+                        "status": "healthy",
+                        "company_name": company.get("name", "Unknown"),
+                        "company_id": company.get("id"),
+                        "api_version": "WS2",
+                        "message": "Successfully connected to CAST Highlight API",
+                    }
+                except Exception as health_error:
+                    # Return unhealthy status with error info
+                    result = {
+                        "status": "unhealthy",
+                        "company_name": None,
+                        "company_id": None,
+                        "api_version": "WS2",
+                        "message": _sanitize_error_message(health_error),
+                    }
             else:
                 # Unknown tool - log warning and return error
                 duration_ms = ctx.elapsed_ms()

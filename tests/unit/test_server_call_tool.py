@@ -587,3 +587,142 @@ class TestSanitizeErrorMessage:
         assert result == "An unexpected error occurred"
         assert "xyz123" not in result
         assert "password" not in result
+
+
+class TestCallToolHealthCheck:
+    """Tests for highlight_health_check tool."""
+
+    @pytest.mark.asyncio
+    async def test_health_check_success(self):
+        """Test highlight_health_check returns healthy status when API is accessible."""
+        mock_client = AsyncMock()
+        mock_client.get_company.return_value = {
+            "id": 1234,
+            "name": "Test Company",
+            "status": "active",
+        }
+
+        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
+            result = await call_tool("highlight_health_check", {})
+
+        assert len(result) == 1
+        assert result[0].type == "text"
+        data = json.loads(result[0].text)
+        assert data["status"] == "healthy"
+        assert data["company_name"] == "Test Company"
+        assert data["company_id"] == 1234
+        assert data["api_version"] == "WS2"
+        assert data["message"] == "Successfully connected to CAST Highlight API"
+        mock_client.get_company.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_health_check_unhealthy_on_connection_error(self):
+        """Test highlight_health_check returns unhealthy status on connection error."""
+        import httpx
+
+        mock_client = AsyncMock()
+        mock_client.get_company.side_effect = httpx.ConnectError(
+            "Failed to connect to api.casthighlight.com"
+        )
+
+        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
+            result = await call_tool("highlight_health_check", {})
+
+        assert len(result) == 1
+        data = json.loads(result[0].text)
+        assert data["status"] == "unhealthy"
+        assert data["company_name"] is None
+        assert data["company_id"] is None
+        assert data["api_version"] == "WS2"
+        assert "Unable to connect" in data["message"]
+
+    @pytest.mark.asyncio
+    async def test_health_check_unhealthy_on_auth_error(self):
+        """Test highlight_health_check returns unhealthy status on authentication error."""
+        import httpx
+
+        mock_client = AsyncMock()
+        mock_client.get_company.side_effect = httpx.HTTPStatusError(
+            "401 Unauthorized",
+            request=MagicMock(),
+            response=MagicMock(status_code=401),
+        )
+
+        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
+            result = await call_tool("highlight_health_check", {})
+
+        assert len(result) == 1
+        data = json.loads(result[0].text)
+        assert data["status"] == "unhealthy"
+        assert data["company_name"] is None
+        assert data["company_id"] is None
+        assert "Authentication failed" in data["message"]
+
+    @pytest.mark.asyncio
+    async def test_health_check_unhealthy_on_timeout(self):
+        """Test highlight_health_check returns unhealthy status on timeout."""
+        import httpx
+
+        mock_client = AsyncMock()
+        mock_client.get_company.side_effect = httpx.TimeoutException("Connection timed out")
+
+        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
+            result = await call_tool("highlight_health_check", {})
+
+        assert len(result) == 1
+        data = json.loads(result[0].text)
+        assert data["status"] == "unhealthy"
+        assert data["company_name"] is None
+        assert "timed out" in data["message"]
+
+    @pytest.mark.asyncio
+    async def test_health_check_unhealthy_on_server_error(self):
+        """Test highlight_health_check returns unhealthy status on server error."""
+        import httpx
+
+        mock_client = AsyncMock()
+        mock_client.get_company.side_effect = httpx.HTTPStatusError(
+            "500 Internal Server Error",
+            request=MagicMock(),
+            response=MagicMock(status_code=500),
+        )
+
+        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
+            result = await call_tool("highlight_health_check", {})
+
+        assert len(result) == 1
+        data = json.loads(result[0].text)
+        assert data["status"] == "unhealthy"
+        assert "Server error" in data["message"]
+
+    @pytest.mark.asyncio
+    async def test_health_check_with_missing_company_name(self):
+        """Test highlight_health_check handles missing company name gracefully."""
+        mock_client = AsyncMock()
+        mock_client.get_company.return_value = {
+            "id": 5678,
+            # name is missing
+        }
+
+        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
+            result = await call_tool("highlight_health_check", {})
+
+        data = json.loads(result[0].text)
+        assert data["status"] == "healthy"
+        assert data["company_name"] == "Unknown"
+        assert data["company_id"] == 5678
+
+    @pytest.mark.asyncio
+    async def test_health_check_unhealthy_on_generic_exception(self):
+        """Test highlight_health_check returns unhealthy status on generic exception."""
+        mock_client = AsyncMock()
+        mock_client.get_company.side_effect = Exception("Unexpected internal error")
+
+        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
+            result = await call_tool("highlight_health_check", {})
+
+        assert len(result) == 1
+        data = json.loads(result[0].text)
+        assert data["status"] == "unhealthy"
+        assert data["company_name"] is None
+        assert "unexpected error" in data["message"].lower()
