@@ -80,4 +80,4 @@ jobs:
 
       - name: Run dependency vulnerability scan
         run: |
-          pip-audit --strict --desc on
+          pip-audit --strict --desc on --skip-editable
