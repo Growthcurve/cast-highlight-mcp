@@ -253,6 +253,59 @@ make test-coverage
 
 ---
 
+## [P1] Augment Code Review Workflow
+
+This repository uses [Augment Code](https://www.augmentcode.com/) for automated PR reviews.
+
+### How It Works
+
+1. **Auto-review on first commit**: Augment automatically reviews the first commit on any PR
+2. **Eyes emoji (👀)**: Indicates Augment is currently reviewing - wait for it to complete
+3. **Review comments**: Augment posts inline suggestions on specific lines
+4. **Summary comment**: Posts a PR summary with "No suggestions" or "N suggestions posted"
+
+### Checking Review Status
+
+```bash
+# Check for Augment reviews on a PR
+gh api repos/OWNER/REPO/pulls/PR_NUMBER/reviews \
+  --jq '.[] | select(.user.login | contains("augment")) | {state, body}'
+
+# Check for inline suggestions
+gh api repos/OWNER/REPO/pulls/PR_NUMBER/comments \
+  --jq '.[] | select(.user.login | contains("augment")) | {path, line, body}'
+```
+
+### Triggering Re-review
+
+After pushing fixes for Augment feedback, trigger a new review:
+
+```bash
+gh pr comment PR_NUMBER --body "auggie review"
+```
+
+**Note**: Only needed after subsequent commits. First commit is auto-reviewed.
+
+### Workflow
+
+1. Create PR → Augment auto-reviews (watch for 👀 emoji)
+2. Check review: "No suggestions" = ready to merge
+3. If suggestions posted:
+   - Read inline comments
+   - Fix issues
+   - Push commits
+   - Comment `auggie review` to re-trigger
+   - Wait for "No suggestions"
+4. Merge when Augment approves
+
+### Best Practices
+
+- **Don't merge until Augment reviews** - Always wait for the review to complete
+- **Address all suggestions** - Fix issues or explain why not applicable
+- **Create follow-up issues** - For valid feedback on already-merged PRs
+
+---
+
 ## [P2] Available MCP Tools
 
 | Tool | Description |
