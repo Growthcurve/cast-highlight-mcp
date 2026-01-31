@@ -70,7 +70,7 @@ def get_client() -> HighlightClient:
         RuntimeError: If called before client is initialized.
     """
     if _client is None:
-        raise RuntimeError("Client not initialized. Server must be started with run_server().")
+        raise RuntimeError("Client not initialized. Server lifecycle not started.")
     return _client
 
 
@@ -84,7 +84,7 @@ def get_config() -> Config:
         RuntimeError: If called before config is loaded.
     """
     if _config is None:
-        raise RuntimeError("Config not loaded. Server must be started with run_server().")
+        raise RuntimeError("Config not loaded. Server lifecycle not started.")
     return _config
 
 
