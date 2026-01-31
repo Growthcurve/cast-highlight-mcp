@@ -414,3 +414,168 @@ class TestToolNameInLogs:
         ]
         assert len(completed_records) == 1
         assert completed_records[0].context["tool_name"] == "highlight_get_domain"
+
+
+class TestHealthCheckObservability:
+    """Tests for health check observability (Issue #27).
+
+    These tests verify that unhealthy health check results are properly
+    observable through logging, even though the tool call itself succeeds.
+    """
+
+    @pytest.fixture
+    def mock_config(self):
+        """Create a mock config with standard base_url."""
+        config = MagicMock()
+        config.base_url = "https://app.casthighlight.com/WS2"
+        return config
+
+    @pytest.mark.asyncio
+    async def test_unhealthy_health_check_produces_warning_log(
+        self, capture_logs, reset_metrics, mock_config
+    ):
+        """Test that unhealthy health check produces WARNING level log."""
+        mock_client = AsyncMock()
+        mock_client.get_company.side_effect = httpx.ConnectError("Connection failed")
+
+        with (
+            patch("cast_highlight_mcp.server.get_client", return_value=mock_client),
+            patch("cast_highlight_mcp.server.get_config", return_value=mock_config),
+        ):
+            await call_tool("highlight_health_check", {})
+
+        # Check for WARNING level log about unhealthy status
+        warning_records = [r for r in capture_logs.records if r.levelno == logging.WARNING]
+        assert len(warning_records) >= 1
+
+        # Find the specific health check warning
+        health_warnings = [
+            r for r in warning_records if "Health check returned unhealthy" in r.getMessage()
+        ]
+        assert len(health_warnings) == 1
+
+    @pytest.mark.asyncio
+    async def test_unhealthy_health_check_warning_includes_error_type(
+        self, capture_logs, reset_metrics, mock_config
+    ):
+        """Test that unhealthy health check warning includes error_type in context."""
+        mock_client = AsyncMock()
+        mock_client.get_company.side_effect = httpx.TimeoutException("Timed out")
+
+        with (
+            patch("cast_highlight_mcp.server.get_client", return_value=mock_client),
+            patch("cast_highlight_mcp.server.get_config", return_value=mock_config),
+        ):
+            await call_tool("highlight_health_check", {})
+
+        # Find the health check warning
+        health_warnings = [
+            r for r in capture_logs.records if "Health check returned unhealthy" in r.getMessage()
+        ]
+        assert len(health_warnings) == 1
+
+        # Verify context includes error_type
+        context = health_warnings[0].context
+        assert "error_type" in context
+        assert context["error_type"] == "timeout"
+
+    @pytest.mark.asyncio
+    async def test_unhealthy_health_check_warning_includes_health_status(
+        self, capture_logs, reset_metrics, mock_config
+    ):
+        """Test that unhealthy health check warning includes health_status in context."""
+        mock_client = AsyncMock()
+        mock_client.get_company.side_effect = httpx.HTTPStatusError(
+            "401 Unauthorized",
+            request=MagicMock(),
+            response=MagicMock(status_code=401),
+        )
+
+        with (
+            patch("cast_highlight_mcp.server.get_client", return_value=mock_client),
+            patch("cast_highlight_mcp.server.get_config", return_value=mock_config),
+        ):
+            await call_tool("highlight_health_check", {})
+
+        # Find the health check warning
+        health_warnings = [
+            r for r in capture_logs.records if "Health check returned unhealthy" in r.getMessage()
+        ]
+        assert len(health_warnings) == 1
+
+        # Verify context includes health_status
+        context = health_warnings[0].context
+        assert "health_status" in context
+        assert context["health_status"] == "unhealthy"
+
+    @pytest.mark.asyncio
+    async def test_healthy_health_check_does_not_produce_warning(
+        self, capture_logs, reset_metrics, mock_config
+    ):
+        """Test that healthy health check does NOT produce warning log."""
+        mock_client = AsyncMock()
+        mock_client.get_company.return_value = {"id": 1234, "name": "Test Co"}
+
+        with (
+            patch("cast_highlight_mcp.server.get_client", return_value=mock_client),
+            patch("cast_highlight_mcp.server.get_config", return_value=mock_config),
+        ):
+            await call_tool("highlight_health_check", {})
+
+        # Should not have any warning about unhealthy status
+        health_warnings = [
+            r for r in capture_logs.records if "Health check returned unhealthy" in r.getMessage()
+        ]
+        assert len(health_warnings) == 0
+
+    @pytest.mark.asyncio
+    async def test_unhealthy_health_check_still_records_success_in_metrics(
+        self, reset_metrics, mock_config
+    ):
+        """Test that unhealthy health check still records as success in metrics.
+
+        This verifies the intentional behavior: the tool call succeeded (it correctly
+        reported the health state), so metrics show success=True. The WARNING log
+        and error_type in response provide the observability for monitoring.
+        """
+        mock_client = AsyncMock()
+        mock_client.get_company.side_effect = httpx.ConnectError("Connection failed")
+
+        with (
+            patch("cast_highlight_mcp.server.get_client", return_value=mock_client),
+            patch("cast_highlight_mcp.server.get_config", return_value=mock_config),
+        ):
+            await call_tool("highlight_health_check", {})
+
+        # Tool call metrics should show success (tool executed correctly)
+        metrics = get_metrics_collector().get_metrics()
+        assert "highlight_health_check" in metrics.tools
+        tool_metrics = metrics.tools["highlight_health_check"]
+        assert tool_metrics.calls_total == 1
+        assert tool_metrics.calls_success == 1  # Tool call succeeded
+        assert tool_metrics.calls_error == 0  # No tool error
+
+    @pytest.mark.asyncio
+    async def test_unhealthy_health_check_warning_includes_request_id(
+        self, capture_logs, reset_metrics, mock_config
+    ):
+        """Test that unhealthy health check warning includes request_id for correlation."""
+        mock_client = AsyncMock()
+        mock_client.get_company.side_effect = httpx.ConnectError("Connection failed")
+
+        with (
+            patch("cast_highlight_mcp.server.get_client", return_value=mock_client),
+            patch("cast_highlight_mcp.server.get_config", return_value=mock_config),
+        ):
+            await call_tool("highlight_health_check", {})
+
+        # Find the health check warning
+        health_warnings = [
+            r for r in capture_logs.records if "Health check returned unhealthy" in r.getMessage()
+        ]
+        assert len(health_warnings) == 1
+
+        # Verify context includes request_id for correlation
+        context = health_warnings[0].context
+        assert "request_id" in context
+        assert context["request_id"] is not None
