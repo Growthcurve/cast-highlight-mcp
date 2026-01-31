@@ -50,6 +50,16 @@ class HighlightClient:
     """Client for CAST Highlight REST API."""
 
     def __init__(self, config: Config):
+        # Validate retry configuration to ensure sane values
+        if config.retry_attempts < 1:
+            raise ValueError("retry_attempts must be at least 1")
+        if config.retry_min_wait < 0:
+            raise ValueError("retry_min_wait must be non-negative")
+        if config.retry_max_wait < config.retry_min_wait:
+            raise ValueError("retry_max_wait must be >= retry_min_wait")
+        if config.retry_multiplier <= 0:
+            raise ValueError("retry_multiplier must be positive")
+
         self.config = config
         self.base_url = config.base_url.rstrip("/")
         self._client: httpx.AsyncClient | None = None
@@ -136,20 +146,21 @@ class HighlightClient:
         except Exception:
             pass  # Logging should never break the request
 
-        start_time = time.perf_counter()
+        overall_start_time = time.perf_counter()
         attempt_number = 0
 
         async def _make_request() -> Any:
             """Inner function that makes the actual request."""
             nonlocal attempt_number
             attempt_number += 1
+            attempt_start_time = time.perf_counter()
 
             client = await self._get_client()
             url = f"{self.base_url}{path}"
             response = await client.request(method, url, **kwargs)
 
-            # Calculate duration
-            duration_ms = (time.perf_counter() - start_time) * 1000
+            # Calculate per-attempt duration (not cumulative across retries)
+            duration_ms = (time.perf_counter() - attempt_start_time) * 1000
             status_code = response.status_code
 
             # Determine log level based on status code
@@ -206,7 +217,7 @@ class HighlightClient:
                 with attempt:
                     return await _make_request()
         except httpx.TimeoutException:
-            duration_ms = (time.perf_counter() - start_time) * 1000
+            total_duration_ms = (time.perf_counter() - overall_start_time) * 1000
             try:
                 logger.warning(
                     "HTTP request timeout after retries",
@@ -214,7 +225,7 @@ class HighlightClient:
                         "context": {
                             "method": method,
                             "path": path,
-                            "duration_ms": round(duration_ms, 2),
+                            "total_duration_ms": round(total_duration_ms, 2),
                             "error_type": "timeout",
                             "request_id": request_id,
                             "attempts": attempt_number,
@@ -226,7 +237,7 @@ class HighlightClient:
             raise
 
         except httpx.HTTPStatusError as e:
-            duration_ms = (time.perf_counter() - start_time) * 1000
+            total_duration_ms = (time.perf_counter() - overall_start_time) * 1000
             # Log if this was a retryable error that exhausted retries
             if _is_retryable_exception(e) and attempt_number > 1:
                 try:
@@ -237,7 +248,7 @@ class HighlightClient:
                                 "method": method,
                                 "path": path,
                                 "status_code": e.response.status_code,
-                                "duration_ms": round(duration_ms, 2),
+                                "total_duration_ms": round(total_duration_ms, 2),
                                 "request_id": request_id,
                                 "attempts": attempt_number,
                             }
@@ -248,7 +259,7 @@ class HighlightClient:
             raise
 
         except httpx.RequestError as e:
-            duration_ms = (time.perf_counter() - start_time) * 1000
+            total_duration_ms = (time.perf_counter() - overall_start_time) * 1000
             try:
                 logger.error(
                     "HTTP request failed after retries",
@@ -256,7 +267,7 @@ class HighlightClient:
                         "context": {
                             "method": method,
                             "path": path,
-                            "duration_ms": round(duration_ms, 2),
+                            "total_duration_ms": round(total_duration_ms, 2),
                             "error_type": type(e).__name__,
                             "error_message": str(e),
                             "request_id": request_id,

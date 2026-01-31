@@ -669,6 +669,92 @@ class TestRetryEdgeCases:
         assert call_count == 4
 
 
+class TestRetryConfigValidation:
+    """Tests for retry configuration validation in HighlightClient.__init__."""
+
+    def test_rejects_zero_retry_attempts(self):
+        """Test that retry_attempts=0 raises ValueError."""
+        config = Config(
+            base_url="https://example.com",
+            access_token="token",
+            company_id=1,
+            retry_attempts=0,
+        )
+        with pytest.raises(ValueError, match="retry_attempts must be at least 1"):
+            HighlightClient(config)
+
+    def test_rejects_negative_retry_attempts(self):
+        """Test that negative retry_attempts raises ValueError."""
+        config = Config(
+            base_url="https://example.com",
+            access_token="token",
+            company_id=1,
+            retry_attempts=-1,
+        )
+        with pytest.raises(ValueError, match="retry_attempts must be at least 1"):
+            HighlightClient(config)
+
+    def test_rejects_negative_retry_min_wait(self):
+        """Test that negative retry_min_wait raises ValueError."""
+        config = Config(
+            base_url="https://example.com",
+            access_token="token",
+            company_id=1,
+            retry_min_wait=-0.5,
+        )
+        with pytest.raises(ValueError, match="retry_min_wait must be non-negative"):
+            HighlightClient(config)
+
+    def test_rejects_max_wait_less_than_min_wait(self):
+        """Test that retry_max_wait < retry_min_wait raises ValueError."""
+        config = Config(
+            base_url="https://example.com",
+            access_token="token",
+            company_id=1,
+            retry_min_wait=10.0,
+            retry_max_wait=5.0,
+        )
+        with pytest.raises(ValueError, match="retry_max_wait must be >= retry_min_wait"):
+            HighlightClient(config)
+
+    def test_rejects_zero_retry_multiplier(self):
+        """Test that retry_multiplier=0 raises ValueError."""
+        config = Config(
+            base_url="https://example.com",
+            access_token="token",
+            company_id=1,
+            retry_multiplier=0,
+        )
+        with pytest.raises(ValueError, match="retry_multiplier must be positive"):
+            HighlightClient(config)
+
+    def test_rejects_negative_retry_multiplier(self):
+        """Test that negative retry_multiplier raises ValueError."""
+        config = Config(
+            base_url="https://example.com",
+            access_token="token",
+            company_id=1,
+            retry_multiplier=-1.0,
+        )
+        with pytest.raises(ValueError, match="retry_multiplier must be positive"):
+            HighlightClient(config)
+
+    def test_accepts_valid_retry_config(self):
+        """Test that valid retry configuration is accepted."""
+        config = Config(
+            base_url="https://example.com",
+            access_token="token",
+            company_id=1,
+            retry_attempts=5,
+            retry_min_wait=0.5,
+            retry_max_wait=30.0,
+            retry_multiplier=2.0,
+        )
+        # Should not raise
+        client = HighlightClient(config)
+        assert client.config.retry_attempts == 5
+
+
 class TestConfigDefaults:
     """Tests for Config default values for retry settings."""
 
