@@ -941,3 +941,93 @@ class TestCallToolHealthCheck:
         data = json.loads(result[0].text)
         assert data["status"] == "unhealthy"
         assert data["api_version"] == "v2-beta"  # Should still include version from config
+
+    @pytest.mark.asyncio
+    async def test_health_check_unhealthy_includes_error_type(self, mock_config):
+        """Test unhealthy health check response includes error_type for debugging."""
+        import httpx
+
+        mock_client = AsyncMock()
+        mock_client.get_company.side_effect = httpx.ConnectError("Connection failed")
+
+        with (
+            patch("cast_highlight_mcp.server.get_client", return_value=mock_client),
+            patch("cast_highlight_mcp.server.get_config", return_value=mock_config),
+        ):
+            result = await call_tool("highlight_health_check", {})
+
+        data = json.loads(result[0].text)
+        assert data["status"] == "unhealthy"
+        assert data["error_type"] == "connection"
+
+    @pytest.mark.asyncio
+    async def test_health_check_unhealthy_timeout_error_type(self, mock_config):
+        """Test unhealthy health check includes timeout error_type."""
+        import httpx
+
+        mock_client = AsyncMock()
+        mock_client.get_company.side_effect = httpx.TimeoutException("Timed out")
+
+        with (
+            patch("cast_highlight_mcp.server.get_client", return_value=mock_client),
+            patch("cast_highlight_mcp.server.get_config", return_value=mock_config),
+        ):
+            result = await call_tool("highlight_health_check", {})
+
+        data = json.loads(result[0].text)
+        assert data["status"] == "unhealthy"
+        assert data["error_type"] == "timeout"
+
+    @pytest.mark.asyncio
+    async def test_health_check_unhealthy_http_401_error_type(self, mock_config):
+        """Test unhealthy health check includes http_401 error_type for auth failures."""
+        import httpx
+
+        mock_client = AsyncMock()
+        mock_client.get_company.side_effect = httpx.HTTPStatusError(
+            "401 Unauthorized",
+            request=MagicMock(),
+            response=MagicMock(status_code=401),
+        )
+
+        with (
+            patch("cast_highlight_mcp.server.get_client", return_value=mock_client),
+            patch("cast_highlight_mcp.server.get_config", return_value=mock_config),
+        ):
+            result = await call_tool("highlight_health_check", {})
+
+        data = json.loads(result[0].text)
+        assert data["status"] == "unhealthy"
+        assert data["error_type"] == "http_401"
+
+    @pytest.mark.asyncio
+    async def test_health_check_unhealthy_unknown_error_type(self, mock_config):
+        """Test unhealthy health check includes unknown error_type for generic exceptions."""
+        mock_client = AsyncMock()
+        mock_client.get_company.side_effect = Exception("Some unexpected error")
+
+        with (
+            patch("cast_highlight_mcp.server.get_client", return_value=mock_client),
+            patch("cast_highlight_mcp.server.get_config", return_value=mock_config),
+        ):
+            result = await call_tool("highlight_health_check", {})
+
+        data = json.loads(result[0].text)
+        assert data["status"] == "unhealthy"
+        assert data["error_type"] == "unknown"
+
+    @pytest.mark.asyncio
+    async def test_health_check_healthy_does_not_include_error_type(self, mock_config):
+        """Test healthy health check response does not include error_type."""
+        mock_client = AsyncMock()
+        mock_client.get_company.return_value = {"id": 1234, "name": "Test Company"}
+
+        with (
+            patch("cast_highlight_mcp.server.get_client", return_value=mock_client),
+            patch("cast_highlight_mcp.server.get_config", return_value=mock_config),
+        ):
+            result = await call_tool("highlight_health_check", {})
+
+        data = json.loads(result[0].text)
+        assert data["status"] == "healthy"
+        assert "error_type" not in data

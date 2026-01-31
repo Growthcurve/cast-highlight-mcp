@@ -392,14 +392,29 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                     # Returning "unhealthy" status IS a successful tool execution - the tool
                     # correctly reported the health state. This is different from the tool
                     # itself failing. The outer call_tool metrics will show success=True
-                    # because the tool executed its contract correctly. For monitoring
-                    # API connectivity issues, consumers should check the "status" field
-                    # in the response, not the tool execution success.
+                    # because the tool executed its contract correctly.
+                    #
+                    # However, we log at WARNING level and include error_type in the response
+                    # so that monitoring/observability systems can detect API connectivity
+                    # issues even though the tool call itself succeeded.
+                    error_type = _classify_error(health_error)
+                    logger.warning(
+                        "Health check returned unhealthy status",
+                        extra={
+                            "context": {
+                                "tool_name": name,
+                                "request_id": ctx.request_id,
+                                "error_type": error_type,
+                                "health_status": "unhealthy",
+                            }
+                        },
+                    )
                     result = {
                         "status": "unhealthy",
                         "company_name": None,
                         "company_id": None,
                         "api_version": api_version,
+                        "error_type": error_type,
                         "message": _sanitize_error_message(health_error),
                     }
             else:
