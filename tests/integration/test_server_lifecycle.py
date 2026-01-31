@@ -3,18 +3,38 @@
 These tests verify that the AsyncExitStack properly manages both the
 HighlightClient and stdio_server lifecycles during server operation.
 
-NOTE: These tests intentionally do NOT call `server.main()` directly because:
-1. `main()` uses `asyncio.run()` which cannot be nested in pytest-asyncio tests
-2. `main()` blocks on `stdio_server()` which requires actual stdio streams
-3. The MCP server's `run()` method blocks indefinitely waiting for messages
+This module uses two complementary testing approaches:
 
-Instead, these tests verify the lifecycle behavior by:
-- Testing component behaviors (HighlightClient, get_client, AsyncExitStack) in isolation
-- Verifying that the same patterns used in `main()` work correctly
-- Testing that cleanup happens properly on normal exit and exceptions
+1. PRODUCTION PATH TESTS (TestServerMainFunction):
+   These tests call `server.main()` directly with mocked dependencies to verify
+   the actual production startup sequence:
+   - load_config() is called
+   - configure_logging() is called
+   - HighlightClient is initialized via AsyncExitStack
+   - stdio_server() context manager is entered
+   - server.run() is called with correct arguments
+   - Resources are cleaned up on both normal exit and exceptions
 
-For true end-to-end testing of `main()`, see the manual testing instructions in
-docs/DEVELOPER.md or use `make run` with an MCP client.
+   These tests mock stdio_server and server.run() because:
+   - stdio_server() requires actual stdio streams
+   - server.run() blocks indefinitely waiting for MCP messages
+
+2. ISOLATED COMPONENT TESTS (all other test classes):
+   These tests verify lifecycle behavior without calling main() by:
+   - Testing component behaviors (HighlightClient, get_client, AsyncExitStack) in isolation
+   - Replicating the same patterns used in main() to verify they work correctly
+   - Testing cleanup on normal exit and exceptions
+   - Verifying lazy initialization, idempotent close, and context manager reuse
+
+   This approach is necessary for pytest-asyncio tests because main() uses
+   asyncio.run() which cannot be nested.
+
+Both approaches together provide comprehensive coverage: production path tests
+ensure the startup sequence is correct, while isolated tests verify each
+component's lifecycle behavior in detail.
+
+For true end-to-end testing with an actual MCP client, see the manual testing
+instructions in docs/DEVELOPER.md or use `make run`.
 """
 
 import asyncio
