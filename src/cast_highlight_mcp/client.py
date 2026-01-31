@@ -86,6 +86,7 @@ class HighlightClient:
                 self._client = httpx.AsyncClient(
                     timeout=self.config.timeout,
                     headers=self.headers,
+                    verify=True,  # Explicitly require TLS certificate verification
                 )
             return self._client
 
