@@ -164,9 +164,9 @@ Get health metrics for application 67890 in domain 12345
 
 ---
 
-### highlight_get_technologies
+### highlight_get_components
 
-Get technology breakdown for an application (languages, frameworks, libraries).
+Get third-party components for an application including technologies, versions, licenses, and CVE data.
 
 **Input Schema:**
 ```json
@@ -188,7 +188,7 @@ Get technology breakdown for an application (languages, frameworks, libraries).
 
 **Example Usage:**
 ```
-What technologies does application 67890 in domain 12345 use?
+Show components for application 67890 in domain 12345
 ```
 
 ---
@@ -243,35 +243,6 @@ Get all CVE vulnerabilities across applications in a domain.
 **Example Usage:**
 ```
 Show all CVE vulnerabilities in domain 12345
-```
-
----
-
-### highlight_get_third_parties
-
-Get third-party/open-source components used by an application.
-
-**Input Schema:**
-```json
-{
-  "type": "object",
-  "properties": {
-    "domain_id": {
-      "type": "integer",
-      "description": "Domain ID containing the application"
-    },
-    "application_id": {
-      "type": "integer",
-      "description": "Application ID"
-    }
-  },
-  "required": ["domain_id", "application_id"]
-}
-```
-
-**Example Usage:**
-```
-What open source components does application 67890 in domain 12345 use?
 ```
 
 ---

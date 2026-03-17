@@ -290,26 +290,26 @@ class TestCallToolGetMetrics:
         assert data["softwareHealth"] == 0.85
 
 
-class TestCallToolGetTechnologies:
-    """Tests for highlight_get_technologies tool."""
+class TestCallToolGetComponents:
+    """Tests for highlight_get_components tool."""
 
     @pytest.mark.asyncio
-    async def test_get_technologies_success(self):
-        """Test highlight_get_technologies returns tech breakdown."""
+    async def test_get_components_success(self):
+        """Test highlight_get_components returns component list."""
         mock_client = AsyncMock()
-        mock_client.get_application_technologies.return_value = [
-            {"technology": "Python", "linesOfCode": 5000}
+        mock_client.get_application_components.return_value = [
+            {"name": "spring-core", "version": "5.3.0", "technologies": ["Java"]}
         ]
 
         with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
             result = await call_tool(
-                "highlight_get_technologies",
+                "highlight_get_components",
                 {"domain_id": 50, "application_id": 100},
             )
 
-        mock_client.get_application_technologies.assert_called_once_with(50, 100)
+        mock_client.get_application_components.assert_called_once_with(50, 100)
         data = json.loads(result[0].text)
-        assert data[0]["technology"] == "Python"
+        assert data[0]["name"] == "spring-core"
 
 
 class TestCallToolGetCloudReadiness:
@@ -355,28 +355,6 @@ class TestCallToolGetCVEs:
         mock_client.get_domain_cves.assert_called_once_with(50)
         data = json.loads(result[0].text)
         assert data[0]["cve"] == "CVE-2024-1234"
-
-
-class TestCallToolGetThirdParties:
-    """Tests for highlight_get_third_parties tool."""
-
-    @pytest.mark.asyncio
-    async def test_get_third_parties_success(self):
-        """Test highlight_get_third_parties returns component list."""
-        mock_client = AsyncMock()
-        mock_client.get_application_third_parties.return_value = [
-            {"name": "lodash", "version": "4.17.21", "license": "MIT"}
-        ]
-
-        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
-            result = await call_tool(
-                "highlight_get_third_parties",
-                {"domain_id": 50, "application_id": 500},
-            )
-
-        mock_client.get_application_third_parties.assert_called_once_with(50, 500)
-        data = json.loads(result[0].text)
-        assert data[0]["name"] == "lodash"
 
 
 class TestCallToolGetBenchmark:

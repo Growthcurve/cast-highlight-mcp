@@ -479,11 +479,10 @@ class HighlightClient:
         """Get application results/metrics."""
         return await self.get(f"/domains/{domain_id}/applications/{app_id}/results")
 
-    async def get_application_technologies(self, domain_id: int, app_id: int) -> list[dict]:
-        """Get application components with technology breakdown.
+    async def get_application_components(self, domain_id: int, app_id: int) -> list[dict]:
+        """Get third-party components for an application.
 
-        Uses the components endpoint which includes technology data per component.
-        The /frameworks endpoint documented in API.md returns 404 in practice.
+        Returns components with technology, version, license, and CVE data.
         """
         return await self.get(f"/domains/{domain_id}/applications/{app_id}/components")
 
@@ -498,14 +497,6 @@ class HighlightClient:
         domain-wide vulnerability data.
         """
         return await self.post(f"/domains/{domain_id}/vulnerabilities", json={})
-
-    async def get_application_third_parties(self, domain_id: int, app_id: int) -> list[dict]:
-        """Get third-party components/dependencies used by the application.
-
-        Uses the components endpoint which lists all third-party dependencies.
-        The /dependencies endpoint documented in API.md returns 404 in practice.
-        """
-        return await self.get(f"/domains/{domain_id}/applications/{app_id}/components")
 
     # Benchmark endpoints
     async def get_benchmark(self) -> dict:

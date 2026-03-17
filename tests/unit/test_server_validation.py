@@ -248,22 +248,22 @@ class TestCallToolValidationGetMetrics:
         mock_client.get_application_metrics.assert_not_called()
 
 
-class TestCallToolValidationGetTechnologies:
-    """Tests for validation in highlight_get_technologies tool."""
+class TestCallToolValidationGetComponents:
+    """Tests for validation in highlight_get_components tool."""
 
     @pytest.mark.asyncio
     async def test_valid_args(self):
         """Test valid domain_id and application_id are accepted."""
         mock_client = AsyncMock()
-        mock_client.get_application_technologies.return_value = []
+        mock_client.get_application_components.return_value = []
 
         with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
             await call_tool(
-                "highlight_get_technologies",
+                "highlight_get_components",
                 {"domain_id": 50, "application_id": 200},
             )
 
-        mock_client.get_application_technologies.assert_called_once_with(50, 200)
+        mock_client.get_application_components.assert_called_once_with(50, 200)
 
     @pytest.mark.asyncio
     async def test_invalid_application_id_fails(self):
@@ -272,12 +272,12 @@ class TestCallToolValidationGetTechnologies:
 
         with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
             result = await call_tool(
-                "highlight_get_technologies",
+                "highlight_get_components",
                 {"domain_id": 50, "application_id": -50},
             )
 
         assert "Validation error" in result[0].text
-        mock_client.get_application_technologies.assert_not_called()
+        mock_client.get_application_components.assert_not_called()
 
 
 class TestCallToolValidationGetCloudReadiness:
@@ -336,38 +336,6 @@ class TestCallToolValidationGetCVEs:
 
         assert "Validation error" in result[0].text
         mock_client.get_domain_cves.assert_not_called()
-
-
-class TestCallToolValidationGetThirdParties:
-    """Tests for validation in highlight_get_third_parties tool."""
-
-    @pytest.mark.asyncio
-    async def test_valid_args(self):
-        """Test valid domain_id and application_id are accepted."""
-        mock_client = AsyncMock()
-        mock_client.get_application_third_parties.return_value = []
-
-        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
-            await call_tool(
-                "highlight_get_third_parties",
-                {"domain_id": 50, "application_id": 600},
-            )
-
-        mock_client.get_application_third_parties.assert_called_once_with(50, 600)
-
-    @pytest.mark.asyncio
-    async def test_invalid_application_id_fails(self):
-        """Test invalid application_id is rejected."""
-        mock_client = AsyncMock()
-
-        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
-            result = await call_tool(
-                "highlight_get_third_parties",
-                {"domain_id": 50, "application_id": 0},
-            )
-
-        assert "Validation error" in result[0].text
-        mock_client.get_application_third_parties.assert_not_called()
 
 
 class TestCallToolValidationListDomains:

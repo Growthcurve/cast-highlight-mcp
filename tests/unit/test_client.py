@@ -111,13 +111,13 @@ class TestHighlightClientRequests:
             assert result["softwareHealth"] == 0.85
 
     @pytest.mark.asyncio
-    async def test_get_application_technologies(self, client):
-        """Test getting application technologies via components endpoint."""
+    async def test_get_application_components(self, client):
+        """Test getting application components."""
         components = [{"name": "spring-core", "technologies": ["Java"]}]
         with patch.object(client, "get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = components
 
-            result = await client.get_application_technologies(1234, 5678)
+            result = await client.get_application_components(1234, 5678)
 
             mock_get.assert_called_once_with("/domains/1234/applications/5678/components")
             assert result[0]["name"] == "spring-core"

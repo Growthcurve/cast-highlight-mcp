@@ -41,7 +41,7 @@ class TestToolDefinitions:
             "highlight_list_applications",
             "highlight_get_application",
             "highlight_get_metrics",
-            "highlight_get_technologies",
+            "highlight_get_components",
             "highlight_get_cloud_readiness",
             "highlight_get_cves",
             "highlight_get_benchmark",
@@ -72,7 +72,7 @@ class TestToolSchemas:
         app_tools = [
             "highlight_get_application",
             "highlight_get_metrics",
-            "highlight_get_technologies",
+            "highlight_get_components",
             "highlight_get_cloud_readiness",
         ]
         for tool in TOOLS:

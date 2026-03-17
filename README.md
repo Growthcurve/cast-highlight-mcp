@@ -11,8 +11,7 @@ This MCP server wraps the CAST Highlight REST API, enabling AI agents to:
 - Assess cloud readiness
 - Evaluate software health metrics
 - Review CVE vulnerabilities
-- Analyze green/environmental impact
-- Access third-party component information
+- Inspect third-party components and dependencies
 - Compare against global benchmarks
 
 ## Quick Start
@@ -132,10 +131,9 @@ Or using uv to run directly:
 | `highlight_list_applications` | List all applications in a domain with their health metrics |
 | `highlight_get_application` | Get detailed information about a specific application |
 | `highlight_get_metrics` | Get health metrics for an application (software health, agility, elegance, resiliency) |
-| `highlight_get_technologies` | Get technology breakdown for an application (languages, frameworks, libraries) |
+| `highlight_get_components` | Get third-party components including technologies, versions, licenses, and CVEs |
 | `highlight_get_cloud_readiness` | Get cloud migration readiness assessment for an application |
 | `highlight_get_cves` | Get all CVE vulnerabilities across applications in a domain |
-| `highlight_get_third_parties` | Get third-party/open-source components used by an application |
 | `highlight_get_benchmark` | Get benchmark statistics comparing against all CAST Highlight applications globally |
 
 ## Development

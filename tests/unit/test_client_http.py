@@ -294,19 +294,19 @@ class TestListDomainsScanning:
         assert len(result) == 1
 
 
-class TestThirdParties:
-    """Tests for third parties endpoint."""
+class TestComponents:
+    """Tests for components endpoint."""
 
     @pytest.mark.asyncio
-    async def test_get_application_third_parties(self, client):
-        """Test get_application_third_parties calls components endpoint."""
+    async def test_get_application_components(self, client):
+        """Test get_application_components calls correct endpoint."""
         with patch.object(client, "get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = [
                 {"name": "react", "version": "18.2.0"},
                 {"name": "lodash", "version": "4.17.21"},
             ]
 
-            result = await client.get_application_third_parties(1234, 888)
+            result = await client.get_application_components(1234, 888)
 
             mock_get.assert_called_once_with("/domains/1234/applications/888/components")
             assert len(result) == 2

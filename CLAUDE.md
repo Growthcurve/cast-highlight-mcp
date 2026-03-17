@@ -324,10 +324,9 @@ gh pr comment PR_NUMBER --body "auggie review"
 | `highlight_list_applications` | List applications in domain |
 | `highlight_get_application` | Get application details |
 | `highlight_get_metrics` | Get application health metrics |
-| `highlight_get_technologies` | Get technology breakdown |
+| `highlight_get_components` | Get third-party components |
 | `highlight_get_cloud_readiness` | Cloud migration assessment |
 | `highlight_get_cves` | Domain-wide CVE vulnerabilities |
-| `highlight_get_third_parties` | Third-party components |
 | `highlight_get_benchmark` | Global benchmark comparison |
 
 ---

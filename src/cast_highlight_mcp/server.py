@@ -176,8 +176,8 @@ TOOLS = [
         },
     ),
     Tool(
-        name="highlight_get_technologies",
-        description="Get technology breakdown for an application (languages, frameworks, libraries)",
+        name="highlight_get_components",
+        description="Get third-party components for an application including technologies, versions, licenses, and CVE data",
         inputSchema={
             "type": "object",
             "properties": {
@@ -217,21 +217,6 @@ TOOLS = [
                 },
             },
             "required": ["domain_id"],
-        },
-    ),
-    Tool(
-        name="highlight_get_third_parties",
-        description="Get third-party/open-source components used by an application",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "domain_id": {
-                    "type": "integer",
-                    "description": "Domain ID containing the application",
-                },
-                "application_id": {"type": "integer", "description": "Application ID"},
-            },
-            "required": ["domain_id", "application_id"],
         },
     ),
     Tool(
@@ -370,9 +355,9 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 result = await api.get_application_metrics(
                     validated.domain_id, validated.application_id
                 )
-            elif name == "highlight_get_technologies":
+            elif name == "highlight_get_components":
                 validated = validate_application_args(arguments)
-                result = await api.get_application_technologies(
+                result = await api.get_application_components(
                     validated.domain_id, validated.application_id
                 )
             elif name == "highlight_get_cloud_readiness":
@@ -383,11 +368,6 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             elif name == "highlight_get_cves":
                 validated = validate_get_domain_args(arguments)
                 result = await api.get_domain_cves(validated.domain_id)
-            elif name == "highlight_get_third_parties":
-                validated = validate_application_args(arguments)
-                result = await api.get_application_third_parties(
-                    validated.domain_id, validated.application_id
-                )
             elif name == "highlight_get_benchmark":
                 result = await api.get_benchmark()
             elif name == "highlight_health_check":
