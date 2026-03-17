@@ -257,9 +257,12 @@ class TestCallToolGetApplication:
         mock_client.get_application.return_value = {"id": 5678, "name": "TestApp"}
 
         with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
-            result = await call_tool("highlight_get_application", {"application_id": 5678})
+            result = await call_tool(
+                "highlight_get_application",
+                {"domain_id": 100, "application_id": 5678},
+            )
 
-        mock_client.get_application.assert_called_once_with(5678)
+        mock_client.get_application.assert_called_once_with(100, 5678)
         data = json.loads(result[0].text)
         assert data["id"] == 5678
 
@@ -277,30 +280,36 @@ class TestCallToolGetMetrics:
         }
 
         with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
-            result = await call_tool("highlight_get_metrics", {"application_id": 999})
+            result = await call_tool(
+                "highlight_get_metrics",
+                {"domain_id": 100, "application_id": 999},
+            )
 
-        mock_client.get_application_metrics.assert_called_once_with(999)
+        mock_client.get_application_metrics.assert_called_once_with(100, 999)
         data = json.loads(result[0].text)
         assert data["softwareHealth"] == 0.85
 
 
-class TestCallToolGetTechnologies:
-    """Tests for highlight_get_technologies tool."""
+class TestCallToolGetComponents:
+    """Tests for highlight_get_components tool."""
 
     @pytest.mark.asyncio
-    async def test_get_technologies_success(self):
-        """Test highlight_get_technologies returns tech breakdown."""
+    async def test_get_components_success(self):
+        """Test highlight_get_components returns component list."""
         mock_client = AsyncMock()
-        mock_client.get_application_technologies.return_value = [
-            {"technology": "Python", "linesOfCode": 5000}
+        mock_client.get_application_components.return_value = [
+            {"name": "spring-core", "version": "5.3.0", "technologies": ["Java"]}
         ]
 
         with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
-            result = await call_tool("highlight_get_technologies", {"application_id": 100})
+            result = await call_tool(
+                "highlight_get_components",
+                {"domain_id": 50, "application_id": 100},
+            )
 
-        mock_client.get_application_technologies.assert_called_once_with(100)
+        mock_client.get_application_components.assert_called_once_with(50, 100)
         data = json.loads(result[0].text)
-        assert data[0]["technology"] == "Python"
+        assert data[0]["name"] == "spring-core"
 
 
 class TestCallToolGetCloudReadiness:
@@ -316,31 +325,14 @@ class TestCallToolGetCloudReadiness:
         }
 
         with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
-            result = await call_tool("highlight_get_cloud_readiness", {"application_id": 200})
+            result = await call_tool(
+                "highlight_get_cloud_readiness",
+                {"domain_id": 50, "application_id": 200},
+            )
 
-        mock_client.get_application_cloud_readiness.assert_called_once_with(200)
+        mock_client.get_application_cloud_readiness.assert_called_once_with(50, 200)
         data = json.loads(result[0].text)
         assert data["cloudReadyScore"] == 75
-
-
-class TestCallToolGetGreenImpact:
-    """Tests for highlight_get_green_impact tool."""
-
-    @pytest.mark.asyncio
-    async def test_get_green_impact_success(self):
-        """Test highlight_get_green_impact returns environmental metrics."""
-        mock_client = AsyncMock()
-        mock_client.get_application_green_impact.return_value = {
-            "carbonFootprint": 120.5,
-            "greenScore": 65,
-        }
-
-        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
-            result = await call_tool("highlight_get_green_impact", {"application_id": 300})
-
-        mock_client.get_application_green_impact.assert_called_once_with(300)
-        data = json.loads(result[0].text)
-        assert data["greenScore"] == 65
 
 
 class TestCallToolGetCVEs:
@@ -348,37 +340,21 @@ class TestCallToolGetCVEs:
 
     @pytest.mark.asyncio
     async def test_get_cves_success(self):
-        """Test highlight_get_cves returns vulnerability list."""
+        """Test highlight_get_cves returns domain-wide vulnerability list."""
         mock_client = AsyncMock()
-        mock_client.get_application_cves.return_value = [
+        mock_client.get_domain_cves.return_value = [
             {"cve": "CVE-2024-1234", "severity": "HIGH", "cvss": 9.1}
         ]
 
         with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
-            result = await call_tool("highlight_get_cves", {"application_id": 400})
+            result = await call_tool(
+                "highlight_get_cves",
+                {"domain_id": 50},
+            )
 
-        mock_client.get_application_cves.assert_called_once_with(400)
+        mock_client.get_domain_cves.assert_called_once_with(50)
         data = json.loads(result[0].text)
         assert data[0]["cve"] == "CVE-2024-1234"
-
-
-class TestCallToolGetThirdParties:
-    """Tests for highlight_get_third_parties tool."""
-
-    @pytest.mark.asyncio
-    async def test_get_third_parties_success(self):
-        """Test highlight_get_third_parties returns component list."""
-        mock_client = AsyncMock()
-        mock_client.get_application_third_parties.return_value = [
-            {"name": "lodash", "version": "4.17.21", "license": "MIT"}
-        ]
-
-        with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
-            result = await call_tool("highlight_get_third_parties", {"application_id": 500})
-
-        mock_client.get_application_third_parties.assert_called_once_with(500)
-        data = json.loads(result[0].text)
-        assert data[0]["name"] == "lodash"
 
 
 class TestCallToolGetBenchmark:
@@ -461,7 +437,10 @@ class TestCallToolErrorHandling:
         )
 
         with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
-            result = await call_tool("highlight_get_application", {"application_id": 99999})
+            result = await call_tool(
+                "highlight_get_application",
+                {"domain_id": 100, "application_id": 99999},
+            )
 
         assert len(result) == 1
         # Should NOT contain URL or sensitive details

@@ -194,14 +194,16 @@ See [docs/TOKEN-SETUP.md](./docs/TOKEN-SETUP.md) for detailed token generation i
 
 ### Key API Endpoints
 
-| Endpoint | Purpose |
-|----------|---------|
-| `/companies/{id}` | Get company details |
-| `/domains/{id}` | Get domain details |
-| `/domains/{id}/applications` | List applications in domain |
-| `/domains/{id}/applications/{id}` | Get application details |
-| `/domains/{id}/applications/{id}/metrics` | Application health metrics |
-| `/domains/{id}/technologies` | Technologies in domain |
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/companies/{id}` | GET | Get company details |
+| `/domains/{id}` | GET | Get domain details |
+| `/domains/{id}/applications` | GET | List applications in domain |
+| `/domains/{id}/applications/{id}` | GET | Get application details |
+| `/domains/{id}/applications/{id}/results` | GET | Application results/metrics |
+| `/domains/{id}/applications/{id}/components` | GET | Components and technologies |
+| `/domains/{id}/applications/{id}/containerization` | GET | Cloud readiness |
+| `/domains/{id}/vulnerabilities` | POST | Domain-wide CVEs |
 
 ### Rate Limiting
 
@@ -322,11 +324,9 @@ gh pr comment PR_NUMBER --body "auggie review"
 | `highlight_list_applications` | List applications in domain |
 | `highlight_get_application` | Get application details |
 | `highlight_get_metrics` | Get application health metrics |
-| `highlight_get_technologies` | Get technology breakdown |
+| `highlight_get_components` | Get third-party components |
 | `highlight_get_cloud_readiness` | Cloud migration assessment |
-| `highlight_get_green_impact` | Environmental impact metrics |
-| `highlight_get_cves` | CVE vulnerabilities |
-| `highlight_get_third_parties` | Third-party components |
+| `highlight_get_cves` | Domain-wide CVE vulnerabilities |
 | `highlight_get_benchmark` | Global benchmark comparison |
 
 ---

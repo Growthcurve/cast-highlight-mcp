@@ -41,7 +41,7 @@ class TestToolDefinitions:
             "highlight_list_applications",
             "highlight_get_application",
             "highlight_get_metrics",
-            "highlight_get_technologies",
+            "highlight_get_components",
             "highlight_get_cloud_readiness",
             "highlight_get_cves",
             "highlight_get_benchmark",
@@ -67,20 +67,29 @@ class TestToolSchemas:
                 required = schema.get("required", [])
                 assert "company_id" not in required, f"{tool.name} company_id should be optional"
 
-    def test_application_tools_require_application_id(self):
-        """Test application tools require application_id."""
+    def test_application_tools_require_domain_and_application_id(self):
+        """Test application tools require both domain_id and application_id."""
         app_tools = [
             "highlight_get_application",
             "highlight_get_metrics",
-            "highlight_get_technologies",
+            "highlight_get_components",
             "highlight_get_cloud_readiness",
-            "highlight_get_cves",
         ]
         for tool in TOOLS:
             if tool.name in app_tools:
                 schema = tool.inputSchema
                 required = schema.get("required", [])
+                assert "domain_id" in required, f"{tool.name} should require domain_id"
                 assert "application_id" in required, f"{tool.name} should require application_id"
+
+    def test_cves_tool_requires_only_domain_id(self):
+        """Test CVE tool requires only domain_id (domain-level endpoint)."""
+        for tool in TOOLS:
+            if tool.name == "highlight_get_cves":
+                schema = tool.inputSchema
+                required = schema.get("required", [])
+                assert "domain_id" in required
+                assert "application_id" not in required
 
     def test_domain_tools_require_domain_id(self):
         """Test domain tools require domain_id."""
