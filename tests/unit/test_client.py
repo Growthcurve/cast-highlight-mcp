@@ -135,13 +135,13 @@ class TestHighlightClientRequests:
             assert result["cloudReady"] == 0.75
 
     @pytest.mark.asyncio
-    async def test_get_application_cves(self, client):
+    async def test_get_domain_cves(self, client):
         """Test getting CVEs via domain-level POST endpoint."""
         cves = [{"name": "CVE-2024-1234", "cvssScore": 9.8}]
         with patch.object(client, "post", new_callable=AsyncMock) as mock_post:
             mock_post.return_value = cves
 
-            result = await client.get_application_cves(1234, 5678)
+            result = await client.get_domain_cves(1234)
 
             mock_post.assert_called_once_with("/domains/1234/vulnerabilities", json={})
             assert result[0]["name"] == "CVE-2024-1234"

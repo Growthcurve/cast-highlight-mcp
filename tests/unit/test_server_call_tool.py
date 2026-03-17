@@ -340,19 +340,19 @@ class TestCallToolGetCVEs:
 
     @pytest.mark.asyncio
     async def test_get_cves_success(self):
-        """Test highlight_get_cves returns vulnerability list."""
+        """Test highlight_get_cves returns domain-wide vulnerability list."""
         mock_client = AsyncMock()
-        mock_client.get_application_cves.return_value = [
+        mock_client.get_domain_cves.return_value = [
             {"cve": "CVE-2024-1234", "severity": "HIGH", "cvss": 9.1}
         ]
 
         with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
             result = await call_tool(
                 "highlight_get_cves",
-                {"domain_id": 50, "application_id": 400},
+                {"domain_id": 50},
             )
 
-        mock_client.get_application_cves.assert_called_once_with(50, 400)
+        mock_client.get_domain_cves.assert_called_once_with(50)
         data = json.loads(result[0].text)
         assert data[0]["cve"] == "CVE-2024-1234"
 

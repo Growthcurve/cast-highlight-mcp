@@ -224,7 +224,7 @@ Is application 67890 in domain 12345 ready for cloud migration?
 
 ### highlight_get_cves
 
-Get CVE vulnerabilities affecting an application's dependencies.
+Get all CVE vulnerabilities across applications in a domain.
 
 **Input Schema:**
 ```json
@@ -233,20 +233,16 @@ Get CVE vulnerabilities affecting an application's dependencies.
   "properties": {
     "domain_id": {
       "type": "integer",
-      "description": "Domain ID containing the application"
-    },
-    "application_id": {
-      "type": "integer",
-      "description": "Application ID"
+      "description": "Domain ID to retrieve CVEs for"
     }
   },
-  "required": ["domain_id", "application_id"]
+  "required": ["domain_id"]
 }
 ```
 
 **Example Usage:**
 ```
-Show CVE vulnerabilities for application 67890 in domain 12345
+Show all CVE vulnerabilities in domain 12345
 ```
 
 ---

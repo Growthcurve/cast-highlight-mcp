@@ -316,32 +316,26 @@ class TestCallToolValidationGetCVEs:
     """Tests for validation in highlight_get_cves tool."""
 
     @pytest.mark.asyncio
-    async def test_valid_args(self):
-        """Test valid domain_id and application_id are accepted."""
+    async def test_valid_domain_id(self):
+        """Test valid domain_id is accepted."""
         mock_client = AsyncMock()
-        mock_client.get_application_cves.return_value = []
+        mock_client.get_domain_cves.return_value = []
 
         with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
-            await call_tool(
-                "highlight_get_cves",
-                {"domain_id": 50, "application_id": 500},
-            )
+            await call_tool("highlight_get_cves", {"domain_id": 50})
 
-        mock_client.get_application_cves.assert_called_once_with(50, 500)
+        mock_client.get_domain_cves.assert_called_once_with(50)
 
     @pytest.mark.asyncio
-    async def test_invalid_application_id_fails(self):
-        """Test invalid application_id is rejected."""
+    async def test_missing_domain_id_fails(self):
+        """Test missing domain_id is rejected."""
         mock_client = AsyncMock()
 
         with patch("cast_highlight_mcp.server.get_client", return_value=mock_client):
-            result = await call_tool(
-                "highlight_get_cves",
-                {"domain_id": 50, "application_id": {}},
-            )
+            result = await call_tool("highlight_get_cves", {})
 
         assert "Validation error" in result[0].text
-        mock_client.get_application_cves.assert_not_called()
+        mock_client.get_domain_cves.assert_not_called()
 
 
 class TestCallToolValidationGetThirdParties:

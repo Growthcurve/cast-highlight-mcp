@@ -491,13 +491,11 @@ class HighlightClient:
         """Get application cloud readiness/containerization assessment."""
         return await self.get(f"/domains/{domain_id}/applications/{app_id}/containerization")
 
-    async def get_application_cves(self, domain_id: int, app_id: int) -> list[dict]:
-        """Get CVEs/vulnerabilities for all applications in the domain.
+    async def get_domain_cves(self, domain_id: int) -> list[dict]:
+        """Get all CVEs/vulnerabilities across applications in a domain.
 
-        Uses the domain-level vulnerabilities endpoint (POST) since the
-        per-application GET endpoint returns 404 in practice.
-        The app_id parameter is accepted for interface consistency but
-        the response contains domain-wide CVE data.
+        Uses POST /domains/{domainId}/vulnerabilities which returns
+        domain-wide vulnerability data.
         """
         return await self.post(f"/domains/{domain_id}/vulnerabilities", json={})
 

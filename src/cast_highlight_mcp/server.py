@@ -207,17 +207,16 @@ TOOLS = [
     ),
     Tool(
         name="highlight_get_cves",
-        description="Get CVE vulnerabilities affecting an application's dependencies",
+        description="Get all CVE vulnerabilities across applications in a domain",
         inputSchema={
             "type": "object",
             "properties": {
                 "domain_id": {
                     "type": "integer",
-                    "description": "Domain ID containing the application",
+                    "description": "Domain ID to retrieve CVEs for",
                 },
-                "application_id": {"type": "integer", "description": "Application ID"},
             },
-            "required": ["domain_id", "application_id"],
+            "required": ["domain_id"],
         },
     ),
     Tool(
@@ -382,10 +381,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                     validated.domain_id, validated.application_id
                 )
             elif name == "highlight_get_cves":
-                validated = validate_application_args(arguments)
-                result = await api.get_application_cves(
-                    validated.domain_id, validated.application_id
-                )
+                validated = validate_get_domain_args(arguments)
+                result = await api.get_domain_cves(validated.domain_id)
             elif name == "highlight_get_third_parties":
                 validated = validate_application_args(arguments)
                 result = await api.get_application_third_parties(
