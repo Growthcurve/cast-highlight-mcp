@@ -215,7 +215,7 @@ def validate_application_args(arguments: dict) -> ValidatedApplicationArgs:
 
     This is used by highlight_get_application, highlight_get_metrics,
     highlight_get_technologies, highlight_get_cloud_readiness,
-    highlight_get_cves, and highlight_get_third_parties tools.
+    and highlight_get_third_parties tools.
 
     Args:
         arguments: The tool arguments dictionary

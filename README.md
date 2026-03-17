@@ -134,8 +134,7 @@ Or using uv to run directly:
 | `highlight_get_metrics` | Get health metrics for an application (software health, agility, elegance, resiliency) |
 | `highlight_get_technologies` | Get technology breakdown for an application (languages, frameworks, libraries) |
 | `highlight_get_cloud_readiness` | Get cloud migration readiness assessment for an application |
-| `highlight_get_green_impact` | Get environmental/green impact metrics for an application |
-| `highlight_get_cves` | Get CVE vulnerabilities affecting an application's dependencies |
+| `highlight_get_cves` | Get all CVE vulnerabilities across applications in a domain |
 | `highlight_get_third_parties` | Get third-party/open-source components used by an application |
 | `highlight_get_benchmark` | Get benchmark statistics comparing against all CAST Highlight applications globally |
 
