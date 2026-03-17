@@ -294,32 +294,21 @@ class TestListDomainsScanning:
         assert len(result) == 1
 
 
-class TestGreenImpactAndThirdParties:
-    """Tests for green impact and third parties endpoints."""
-
-    @pytest.mark.asyncio
-    async def test_get_application_green_impact(self, client):
-        """Test get_application_green_impact calls correct endpoint."""
-        with patch.object(client, "get", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = {"carbonFootprint": 100, "greenIndex": 75}
-
-            result = await client.get_application_green_impact(999)
-
-            mock_get.assert_called_once_with("/applications/999/green")
-            assert result["greenIndex"] == 75
+class TestThirdParties:
+    """Tests for third parties endpoint."""
 
     @pytest.mark.asyncio
     async def test_get_application_third_parties(self, client):
-        """Test get_application_third_parties calls correct endpoint."""
+        """Test get_application_third_parties calls components endpoint."""
         with patch.object(client, "get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = [
                 {"name": "react", "version": "18.2.0"},
                 {"name": "lodash", "version": "4.17.21"},
             ]
 
-            result = await client.get_application_third_parties(888)
+            result = await client.get_application_third_parties(1234, 888)
 
-            mock_get.assert_called_once_with("/applications/888/thirdParties")
+            mock_get.assert_called_once_with("/domains/1234/applications/888/components")
             assert len(result) == 2
             assert result[0]["name"] == "react"
 

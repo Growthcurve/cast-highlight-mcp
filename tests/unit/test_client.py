@@ -93,9 +93,9 @@ class TestHighlightClientRequests:
         with patch.object(client, "get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = sample_application_response
 
-            result = await client.get_application(5678)
+            result = await client.get_application(1234, 5678)
 
-            mock_get.assert_called_once_with("/applications/5678")
+            mock_get.assert_called_once_with("/domains/1234/applications/5678")
             assert result["id"] == 5678
 
     @pytest.mark.asyncio
@@ -105,22 +105,22 @@ class TestHighlightClientRequests:
         with patch.object(client, "get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = metrics
 
-            result = await client.get_application_metrics(5678)
+            result = await client.get_application_metrics(1234, 5678)
 
-            mock_get.assert_called_once_with("/applications/5678/metrics")
+            mock_get.assert_called_once_with("/domains/1234/applications/5678/results")
             assert result["softwareHealth"] == 0.85
 
     @pytest.mark.asyncio
     async def test_get_application_technologies(self, client):
-        """Test getting application technologies."""
-        technologies = [{"technology": "Java", "totalLinesOfCode": 10000}]
+        """Test getting application technologies via components endpoint."""
+        components = [{"name": "spring-core", "technologies": ["Java"]}]
         with patch.object(client, "get", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = technologies
+            mock_get.return_value = components
 
-            result = await client.get_application_technologies(5678)
+            result = await client.get_application_technologies(1234, 5678)
 
-            mock_get.assert_called_once_with("/applications/5678/technologies")
-            assert result[0]["technology"] == "Java"
+            mock_get.assert_called_once_with("/domains/1234/applications/5678/components")
+            assert result[0]["name"] == "spring-core"
 
     @pytest.mark.asyncio
     async def test_get_application_cloud_readiness(self, client):
@@ -129,21 +129,21 @@ class TestHighlightClientRequests:
         with patch.object(client, "get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = cloud_data
 
-            result = await client.get_application_cloud_readiness(5678)
+            result = await client.get_application_cloud_readiness(1234, 5678)
 
-            mock_get.assert_called_once_with("/applications/5678/cloudReady")
+            mock_get.assert_called_once_with("/domains/1234/applications/5678/containerization")
             assert result["cloudReady"] == 0.75
 
     @pytest.mark.asyncio
     async def test_get_application_cves(self, client):
-        """Test getting application CVEs."""
+        """Test getting CVEs via domain-level POST endpoint."""
         cves = [{"name": "CVE-2024-1234", "cvssScore": 9.8}]
-        with patch.object(client, "get", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = cves
+        with patch.object(client, "post", new_callable=AsyncMock) as mock_post:
+            mock_post.return_value = cves
 
-            result = await client.get_application_cves(5678)
+            result = await client.get_application_cves(1234, 5678)
 
-            mock_get.assert_called_once_with("/applications/5678/cve")
+            mock_post.assert_called_once_with("/domains/1234/vulnerabilities", json={})
             assert result[0]["name"] == "CVE-2024-1234"
 
     @pytest.mark.asyncio

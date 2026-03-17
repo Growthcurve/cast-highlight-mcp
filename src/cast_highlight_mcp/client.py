@@ -298,6 +298,9 @@ class HighlightClient:
     async def get(self, path: str, **kwargs) -> Any:
         return await self._request("GET", path, **kwargs)
 
+    async def post(self, path: str, **kwargs) -> Any:
+        return await self._request("POST", path, **kwargs)
+
     # Company endpoints
     async def get_company(self, company_id: int | None = None) -> dict:
         """Get company details."""
@@ -467,33 +470,44 @@ class HighlightClient:
         return await self.get(f"/domains/{domain_id}/applications")
 
     # Application endpoints
-    async def get_application(self, app_id: int) -> dict:
+    # All per-application endpoints are nested under /domains/{domainId}/applications/{appId}
+    async def get_application(self, domain_id: int, app_id: int) -> dict:
         """Get application details."""
-        return await self.get(f"/applications/{app_id}")
+        return await self.get(f"/domains/{domain_id}/applications/{app_id}")
 
-    async def get_application_metrics(self, app_id: int) -> dict:
-        """Get application health metrics."""
-        return await self.get(f"/applications/{app_id}/metrics")
+    async def get_application_metrics(self, domain_id: int, app_id: int) -> dict:
+        """Get application results/metrics."""
+        return await self.get(f"/domains/{domain_id}/applications/{app_id}/results")
 
-    async def get_application_technologies(self, app_id: int) -> list[dict]:
-        """Get application technology breakdown."""
-        return await self.get(f"/applications/{app_id}/technologies")
+    async def get_application_technologies(self, domain_id: int, app_id: int) -> list[dict]:
+        """Get application components with technology breakdown.
 
-    async def get_application_cloud_readiness(self, app_id: int) -> dict:
-        """Get application cloud readiness assessment."""
-        return await self.get(f"/applications/{app_id}/cloudReady")
+        Uses the components endpoint which includes technology data per component.
+        The /frameworks endpoint documented in API.md returns 404 in practice.
+        """
+        return await self.get(f"/domains/{domain_id}/applications/{app_id}/components")
 
-    async def get_application_green_impact(self, app_id: int) -> dict:
-        """Get application green/environmental impact."""
-        return await self.get(f"/applications/{app_id}/green")
+    async def get_application_cloud_readiness(self, domain_id: int, app_id: int) -> dict:
+        """Get application cloud readiness/containerization assessment."""
+        return await self.get(f"/domains/{domain_id}/applications/{app_id}/containerization")
 
-    async def get_application_cves(self, app_id: int) -> list[dict]:
-        """Get CVEs affecting the application."""
-        return await self.get(f"/applications/{app_id}/cve")
+    async def get_application_cves(self, domain_id: int, app_id: int) -> list[dict]:
+        """Get CVEs/vulnerabilities for all applications in the domain.
 
-    async def get_application_third_parties(self, app_id: int) -> list[dict]:
-        """Get third-party components used by the application."""
-        return await self.get(f"/applications/{app_id}/thirdParties")
+        Uses the domain-level vulnerabilities endpoint (POST) since the
+        per-application GET endpoint returns 404 in practice.
+        The app_id parameter is accepted for interface consistency but
+        the response contains domain-wide CVE data.
+        """
+        return await self.post(f"/domains/{domain_id}/vulnerabilities", json={})
+
+    async def get_application_third_parties(self, domain_id: int, app_id: int) -> list[dict]:
+        """Get third-party components/dependencies used by the application.
+
+        Uses the components endpoint which lists all third-party dependencies.
+        The /dependencies endpoint documented in API.md returns 404 in practice.
+        """
+        return await self.get(f"/domains/{domain_id}/applications/{app_id}/components")
 
     # Benchmark endpoints
     async def get_benchmark(self) -> dict:

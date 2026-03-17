@@ -115,18 +115,22 @@ Get detailed information about a specific application.
 {
   "type": "object",
   "properties": {
+    "domain_id": {
+      "type": "integer",
+      "description": "Domain ID containing the application"
+    },
     "application_id": {
       "type": "integer",
       "description": "Application ID"
     }
   },
-  "required": ["application_id"]
+  "required": ["domain_id", "application_id"]
 }
 ```
 
 **Example Usage:**
 ```
-Get details for application 67890
+Get details for application 67890 in domain 12345
 ```
 
 ---
@@ -140,18 +144,22 @@ Get health metrics for an application (software health, agility, elegance, resil
 {
   "type": "object",
   "properties": {
+    "domain_id": {
+      "type": "integer",
+      "description": "Domain ID containing the application"
+    },
     "application_id": {
       "type": "integer",
       "description": "Application ID"
     }
   },
-  "required": ["application_id"]
+  "required": ["domain_id", "application_id"]
 }
 ```
 
 **Example Usage:**
 ```
-Get health metrics for application 67890
+Get health metrics for application 67890 in domain 12345
 ```
 
 ---
@@ -165,18 +173,22 @@ Get technology breakdown for an application (languages, frameworks, libraries).
 {
   "type": "object",
   "properties": {
+    "domain_id": {
+      "type": "integer",
+      "description": "Domain ID containing the application"
+    },
     "application_id": {
       "type": "integer",
       "description": "Application ID"
     }
   },
-  "required": ["application_id"]
+  "required": ["domain_id", "application_id"]
 }
 ```
 
 **Example Usage:**
 ```
-What technologies does application 67890 use?
+What technologies does application 67890 in domain 12345 use?
 ```
 
 ---
@@ -190,43 +202,22 @@ Get cloud migration readiness assessment for an application.
 {
   "type": "object",
   "properties": {
+    "domain_id": {
+      "type": "integer",
+      "description": "Domain ID containing the application"
+    },
     "application_id": {
       "type": "integer",
       "description": "Application ID"
     }
   },
-  "required": ["application_id"]
+  "required": ["domain_id", "application_id"]
 }
 ```
 
 **Example Usage:**
 ```
-Is application 67890 ready for cloud migration?
-```
-
----
-
-### highlight_get_green_impact
-
-Get environmental/green impact metrics for an application.
-
-**Input Schema:**
-```json
-{
-  "type": "object",
-  "properties": {
-    "application_id": {
-      "type": "integer",
-      "description": "Application ID"
-    }
-  },
-  "required": ["application_id"]
-}
-```
-
-**Example Usage:**
-```
-What's the green impact score for application 67890?
+Is application 67890 in domain 12345 ready for cloud migration?
 ```
 
 ---
@@ -240,18 +231,22 @@ Get CVE vulnerabilities affecting an application's dependencies.
 {
   "type": "object",
   "properties": {
+    "domain_id": {
+      "type": "integer",
+      "description": "Domain ID containing the application"
+    },
     "application_id": {
       "type": "integer",
       "description": "Application ID"
     }
   },
-  "required": ["application_id"]
+  "required": ["domain_id", "application_id"]
 }
 ```
 
 **Example Usage:**
 ```
-Show CVE vulnerabilities for application 67890
+Show CVE vulnerabilities for application 67890 in domain 12345
 ```
 
 ---
@@ -265,18 +260,22 @@ Get third-party/open-source components used by an application.
 {
   "type": "object",
   "properties": {
+    "domain_id": {
+      "type": "integer",
+      "description": "Domain ID containing the application"
+    },
     "application_id": {
       "type": "integer",
       "description": "Application ID"
     }
   },
-  "required": ["application_id"]
+  "required": ["domain_id", "application_id"]
 }
 ```
 
 **Example Usage:**
 ```
-What open source components does application 67890 use?
+What open source components does application 67890 in domain 12345 use?
 ```
 
 ---

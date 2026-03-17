@@ -200,8 +200,11 @@ See [docs/TOKEN-SETUP.md](./docs/TOKEN-SETUP.md) for detailed token generation i
 | `/domains/{id}` | Get domain details |
 | `/domains/{id}/applications` | List applications in domain |
 | `/domains/{id}/applications/{id}` | Get application details |
-| `/domains/{id}/applications/{id}/metrics` | Application health metrics |
-| `/domains/{id}/technologies` | Technologies in domain |
+| `/domains/{id}/applications/{id}/results` | Application results/metrics |
+| `/domains/{id}/applications/{id}/frameworks` | Application frameworks |
+| `/domains/{id}/applications/{id}/vulnerabilities` | Application CVEs |
+| `/domains/{id}/applications/{id}/dependencies` | Application dependencies |
+| `/domains/{id}/applications/{id}/containerization` | Cloud readiness |
 
 ### Rate Limiting
 
@@ -324,7 +327,6 @@ gh pr comment PR_NUMBER --body "auggie review"
 | `highlight_get_metrics` | Get application health metrics |
 | `highlight_get_technologies` | Get technology breakdown |
 | `highlight_get_cloud_readiness` | Cloud migration assessment |
-| `highlight_get_green_impact` | Environmental impact metrics |
 | `highlight_get_cves` | CVE vulnerabilities |
 | `highlight_get_third_parties` | Third-party components |
 | `highlight_get_benchmark` | Global benchmark comparison |

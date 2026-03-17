@@ -302,22 +302,34 @@ class TestValidateListApplicationsArgs:
 class TestValidateApplicationArgs:
     """Tests for validate_application_args function."""
 
-    def test_valid_application_id(self):
-        """Test valid application_id is captured."""
-        result = validate_application_args({"application_id": 789})
+    def test_valid_args(self):
+        """Test valid domain_id and application_id are captured."""
+        result = validate_application_args({"domain_id": 100, "application_id": 789})
         assert isinstance(result, ValidatedApplicationArgs)
+        assert result.domain_id == 100
         assert result.application_id == 789
 
     def test_missing_application_id_raises(self):
         """Test missing application_id raises ValidationError."""
         with pytest.raises(ValidationError) as exc_info:
-            validate_application_args({})
+            validate_application_args({"domain_id": 100})
         assert exc_info.value.field == "application_id"
+
+    def test_missing_domain_id_raises(self):
+        """Test missing domain_id raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            validate_application_args({"application_id": 789})
+        assert exc_info.value.field == "domain_id"
+
+    def test_missing_both_raises(self):
+        """Test missing both fields raises ValidationError."""
+        with pytest.raises(ValidationError):
+            validate_application_args({})
 
     def test_invalid_application_id_raises(self):
         """Test invalid application_id raises ValidationError."""
         with pytest.raises(ValidationError):
-            validate_application_args({"application_id": -100})
+            validate_application_args({"domain_id": 100, "application_id": -100})
 
 
 class TestValidatedCompanyArgs:
@@ -346,7 +358,8 @@ class TestValidatedDomainArgs:
 class TestValidatedApplicationArgs:
     """Tests for ValidatedApplicationArgs dataclass."""
 
-    def test_explicit_value(self):
-        """Test explicit value is captured."""
-        args = ValidatedApplicationArgs(application_id=9012)
+    def test_explicit_values(self):
+        """Test explicit values are captured."""
+        args = ValidatedApplicationArgs(domain_id=100, application_id=9012)
+        assert args.domain_id == 100
         assert args.application_id == 9012

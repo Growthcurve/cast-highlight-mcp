@@ -46,9 +46,11 @@ class ValidatedDomainArgs:
 class ValidatedApplicationArgs:
     """Container for validated application-related arguments.
 
-    Used by tools that require an application_id.
+    Used by tools that require both a domain_id and an application_id,
+    since all per-application API endpoints are nested under domains.
     """
 
+    domain_id: int
     application_id: int
 
 
@@ -213,18 +215,19 @@ def validate_application_args(arguments: dict) -> ValidatedApplicationArgs:
 
     This is used by highlight_get_application, highlight_get_metrics,
     highlight_get_technologies, highlight_get_cloud_readiness,
-    highlight_get_green_impact, highlight_get_cves, and
-    highlight_get_third_parties tools.
+    highlight_get_cves, and highlight_get_third_parties tools.
 
     Args:
         arguments: The tool arguments dictionary
 
     Returns:
-        ValidatedApplicationArgs with validated application_id
+        ValidatedApplicationArgs with validated domain_id and application_id
 
     Raises:
         ValidationError: If validation fails
     """
+    domain_id = validate_domain_id(arguments, required=True)
+    assert domain_id is not None  # Required validation ensures this
     application_id = validate_application_id(arguments, required=True)
     assert application_id is not None  # Required validation ensures this
-    return ValidatedApplicationArgs(application_id=application_id)
+    return ValidatedApplicationArgs(domain_id=domain_id, application_id=application_id)
